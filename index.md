@@ -1,5 +1,7 @@
-parallel project
+# parallel project
 
-Team members: Abhy Vytheeswaran, Gauravh Lahiry 
 
-Summary: 
+**Team members**: Abhy Vytheeswaran, Gaurav Lahiry 
+
+
+**Summary**: 
