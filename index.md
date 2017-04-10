@@ -1,4 +1,4 @@
-# parallel project
+# Parallelizing a Deep Neural Network
 
 
 **Team members**: Abhy Vytheeswaran, Gaurav Lahiry 
@@ -62,7 +62,11 @@ We want to use the GHC cluster machines which contain the NVIDIA GeForce GTX 108
 **Schedule** 
 
 April 17  - Implement sequential neural network to classify images in the MNIST dataset.
+
 April 24 - Parallelize matrix multiplications required to train the neural network with CUDA
+
 May 1 - Use OpenMP to parallelize computation across multiple threads of 8-core Xeon
+
 May 8 - Achieve linear speedup and the desired error rate
+
 May 12 - Add more hidden layers to optimize the speedups and error rates and leverage SIMD execution and batch processing as time allows
