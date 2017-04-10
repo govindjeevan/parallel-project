@@ -29,15 +29,19 @@ Through this, we hope to learn the ideas behind parallelizing a neural network f
 Included are papers that we will refer to when implementing our parallel deep neural network. 
 
 Dahl, George, Alan McAvinney, and Tia Newhall. "Parallelizing neural network training for cluster systems." Proceedings of the IASTED International Conference on Parallel and Distributed Computing and Networks. ACTA Press, 2008.
+
 https://www.cs.swarthmore.edu/~newhall/papers/pdcn08.pdf
 
 Krizhevsky, Alex. “One weird trick for parallelizing convolutional neural networks.”. eprint arXiv:1404.599. 2014.
+
 https://arxiv.org/pdf/1404.5997.pdf 
 
 Podlozhnyuk, Victor. "Image Convolution with CUDA."  
+
 http://developer.download.nvidia.com/assets/cuda/files/convolutionSeparable.pdf.
 
 Pethick, Mark, Michael Liddle, Paul Werstein, and Zhiyi Huang. “Parallelization of a Backpropagation Neural Network on a Cluster Computer.” 2003. 
+
 http://www.cs.otago.ac.nz/staffpriv/hzy/papers/pdcs03.pdf 
 
 **Goals and Deliverables** 
@@ -61,12 +65,12 @@ We want to use the GHC cluster machines which contain the NVIDIA GeForce GTX 108
 
 **Schedule** 
 
-April 17  - Implement sequential neural network to classify images in the MNIST dataset.
+*April 17*  - Implement sequential neural network to classify images in the MNIST dataset.
 
-April 24 - Parallelize matrix multiplications required to train the neural network with CUDA
+*April 24*  - Parallelize matrix multiplications required to train the neural network with CUDA
 
-May 1 - Use OpenMP to parallelize computation across multiple threads of 8-core Xeon
+*May 1* - Use OpenMP to parallelize computation across multiple threads of 8-core Xeon
 
-May 8 - Achieve linear speedup and the desired error rate
+*May 8* - Achieve linear speedup and the desired error rate
 
-May 12 - Add more hidden layers to optimize the speedups and error rates and leverage SIMD execution and batch processing as time allows
+*May 12* - Add more hidden layers to optimize the speedups and error rates and leverage SIMD execution and batch processing as time allows
