@@ -31,8 +31,8 @@ Included are papers that we will refer to when implementing our parallel deep ne
 Dahl, George, Alan McAvinney, and Tia Newhall. "Parallelizing neural network training for cluster systems." Proceedings of the IASTED International Conference on Parallel and Distributed Computing and Networks. ACTA Press, 2008.
 https://www.cs.swarthmore.edu/~newhall/papers/pdcn08.pdf
 
-Krizhevsky, Alex. “One weird trick for parallelizing convolutional neural networks.”. eprint arXiv:1404.599. 2014. 
-https://arxiv.org/pdf/1404.5997.pdf 
+Krizhevsky, Alex. “One weird trick for parallelizing convolutional neural networks.”. eprint arXiv:1404.599. 2014.  
+https://arxiv.org/pdf/1404.5997.pdf  
 
 Podlozhnyuk, Victor. "Image Convolution with CUDA." http://developer.download.nvidia.com/assets/cuda/files/convolutionSeparable.pdf.
 
