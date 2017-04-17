@@ -28,12 +28,12 @@ int main()
 	d.setCreationApproach( STATIC, 10 );	
 
 	//create neural network
-	neuralNetwork nn(784,15,10);
+	neuralNetwork nn(784,30,10);
 
 	//create neural network trainer
 	neuralNetworkTrainer nT( &nn );
-	nT.setTrainingParameters(1.2, 0.9, false);
-	nT.setStoppingConditions(100, 100);
+	nT.setTrainingParameters(1.2, 0, false);
+	nT.setStoppingConditions(30, 100);
 	nT.enableLogging("log.csv", 5);
 	
 	//train neural network on data sets

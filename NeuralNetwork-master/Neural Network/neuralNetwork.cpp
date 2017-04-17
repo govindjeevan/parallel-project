@@ -247,6 +247,7 @@ double neuralNetwork::getSetAccuracy( std::vector<dataEntry*>& set )
 		// 	if ( clampOutput(outputNeurons[k]) != set[tp]->target[k] ) correctResult = false;
 		// }
 
+		// cout << "max_element = " << *max_element(outputNeurons, outputNeurons + nOutput) << endl;
 		int predicted = distance(outputNeurons, max_element(outputNeurons, outputNeurons + nOutput));
 		int expected = distance(set[tp]->target, max_element(set[tp]->target, set[tp]->target + nOutput));
 		
@@ -284,6 +285,31 @@ double neuralNetwork::getSetMSE( std::vector<dataEntry*>& set )
 	//calculate error and return as percentage
 	return mse/(nOutput * set.size());
 }
+/*******************************************************************
+* Return the softmax error 
+********************************************************************/
+// double neuralNetwork::getSetMSE( std::vector<dataEntry*>& set )
+// {
+// 	double mse = 0;
+		
+// 	//for every training input array
+// 	for ( int tp = 0; tp < (int) set.size(); tp++)
+// 	{						
+// 		//feed inputs through network and backpropagate errors
+// 		feedForward( set[tp]->pattern );
+		
+// 		//check all outputs against desired output values
+// 		for ( int k = 0; k < nOutput; k++ )
+// 		{					
+// 			//sum all the MSEs together
+// 			mse += pow((outputNeurons[k] - set[tp]->target[k]), 2);
+// 		}		
+		
+// 	}//end for
+	
+// 	//calculate error and return as percentage
+// 	return mse/(nOutput * set.size());
+// }
 /*******************************************************************
 * Initialize Neuron Weights
 ********************************************************************/

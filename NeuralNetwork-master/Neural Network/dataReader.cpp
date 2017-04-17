@@ -98,7 +98,7 @@ void dataReader::processLine( string &line )
     char* nextToken = NULL;
 	t=strtok(cstr, ",");//, &nextToken );
 	
-	while ( t!=NULL && i < (nInputs + nTargets) )
+	while ( t!=NULL && i < (nInputs + 1))//nTargets) )
 	{	
 		// if ( i < nInputs ) pattern[i] = atof(t);
 		// else target[i - nInputs] = atof(t);
