@@ -25,14 +25,15 @@ int main()
 	//create data set reader and load data file
 	dataReader d;
 	d.loadDataFile("mnist_train.csv",784,10);
-	d.setCreationApproach( STATIC, 10 );	
+	d.setNumSets(1);
+	// d.setCreationApproach( STATIC, 10 );	
 
 	//create neural network
 	neuralNetwork nn(784,30,10);
 
 	//create neural network trainer
 	neuralNetworkTrainer nT( &nn );
-	nT.setTrainingParameters(1.2, 0, false);
+	nT.setTrainingParameters(1.2, false);
 	nT.setStoppingConditions(30, 100);
 	nT.enableLogging("log.csv", 5);
 	

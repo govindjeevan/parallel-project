@@ -37,7 +37,7 @@ private:
 
 	//learning parameters
 	double learningRate;					// adjusts the step size of the weight update	
-	double momentum;						// improves performance of stochastic learning (don't use for batch)
+	// double momentum;						// improves performance of stochastic learning (don't use for batch)
 
 	//epoch counter
 	long epoch;
@@ -58,9 +58,9 @@ private:
 	double trainingSetAccuracy;
 	double validationSetAccuracy;
 	double generalizationSetAccuracy;
-	double trainingSetMSE;
-	double validationSetMSE;
-	double generalizationSetMSE;
+	// double trainingSetMSE;
+	// double validationSetMSE;
+	// double generalizationSetMSE;
 
 	//batch learning flag
 	bool useBatch;
@@ -76,7 +76,8 @@ private:
 public:	
 	
 	neuralNetworkTrainer( neuralNetwork* untrainedNetwork );
-	void setTrainingParameters( double lR, double m, bool batch );
+	// void setTrainingParameters( double lR, double m, bool batch );
+	void setTrainingParameters( double lR, bool batch );
 	void setStoppingConditions( int mEpochs, double dAccuracy);
 	void useBatchLearning( bool flag ){ useBatch = flag; }
 	void enableLogging( const char* filename, int resolution );

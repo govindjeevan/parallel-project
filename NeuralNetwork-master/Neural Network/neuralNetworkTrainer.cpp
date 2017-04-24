@@ -15,16 +15,12 @@ using namespace std;
 neuralNetworkTrainer::neuralNetworkTrainer( neuralNetwork *nn )	:	NN(nn),
 																	epoch(0),
 																	learningRate(LEARNING_RATE),
-																	momentum(MOMENTUM),
 																	maxEpochs(MAX_EPOCHS),
 																	desiredAccuracy(DESIRED_ACCURACY),																	
 																	useBatch(false),
 																	trainingSetAccuracy(0),
 																	validationSetAccuracy(0),
-																	generalizationSetAccuracy(0),
-																	trainingSetMSE(0),
-																	validationSetMSE(0),
-																	generalizationSetMSE(0)																	
+																	generalizationSetAccuracy(0)																	
 {
 	//create delta lists
 	//--------------------------------------------------------------------------------------------------------
@@ -55,10 +51,9 @@ neuralNetworkTrainer::neuralNetworkTrainer( neuralNetwork *nn )	:	NN(nn),
 /*******************************************************************
 * Set training parameters
 ********************************************************************/
-void neuralNetworkTrainer::setTrainingParameters( double lR, double m, bool batch )
+void neuralNetworkTrainer::setTrainingParameters( double lR, bool batch )
 {
 	learningRate = lR;
-	momentum = m;
 	useBatch = batch;
 }
 /*******************************************************************
@@ -99,8 +94,6 @@ void neuralNetworkTrainer::enableLogging(const char* filename, int resolution = 
 inline double neuralNetworkTrainer::getOutputErrorGradient( double desiredValue, double outputValue)
 {
 	//return error gradient
-	// cout << "desired = " << desiredValue << endl;
-	// cout << "outputValue = " << outputValue << endl;
 	return outputValue * ( 1 - outputValue ) * ( desiredValue - outputValue );
 }
 
@@ -113,18 +106,8 @@ double neuralNetworkTrainer::getHiddenErrorGradient( int j )
 	double weightedSum = 0;
 	for( int k = 0; k < NN->nOutput; k++ ) {
 		weightedSum += NN->wHiddenOutput[j][k] * outputErrorGradients[k];
-		// if (j==0) {
-		// 	cout << "k = " << k << " oEG = " << outputErrorGradients[k] << endl;
-		// 	cout << "wHO = " << NN->wHiddenOutput[j][k] << endl;
-		// }
 	}
 
-	//return error gradient
-	// if (j==0){
-	// 	cout << "weightedSum = " << weightedSum << endl;
-	// 	cout << "hiddenNeurons = " << NN->hiddenNeurons[j] << endl;
-	// 	cout << "multiplied = " << (NN->hiddenNeurons[j] * ( 1 - NN->hiddenNeurons[j] ) * weightedSum) << endl;
-	// }
 	return NN->hiddenNeurons[j] * ( 1 - NN->hiddenNeurons[j] ) * weightedSum;
 }
 /*******************************************************************
@@ -134,7 +117,7 @@ void neuralNetworkTrainer::trainNetwork( trainingDataSet* tSet )
 {
 	cout	<< endl << " Neural Network Training Starting: " << endl
 			<< "==========================================================================" << endl
-			<< " LR: " << learningRate << ", Momentum: " << momentum << ", Max Epochs: " << maxEpochs << endl
+			<< " LR: " << learningRate << ", Max Epochs: " << maxEpochs << endl
 			<< " " << NN->nInput << " Input Neurons, " << NN->nHidden << " Hidden Neurons, " << NN->nOutput << " Output Neurons" << endl
 			<< "==========================================================================" << endl << endl;
 
@@ -153,14 +136,13 @@ void neuralNetworkTrainer::trainNetwork( trainingDataSet* tSet )
 		//use training set to train network
 		runTrainingEpoch( tSet->trainingSet );
 
-		//get generalization set accuracy and MSE
+		//get generalization set accuracy
 		generalizationSetAccuracy = NN->getSetAccuracy( tSet->generalizationSet );
-		generalizationSetMSE = NN->getSetMSE( tSet->generalizationSet );
 
 		//Log Training results
 		if ( loggingEnabled && logFile.is_open() && ( epoch - lastEpochLogged == logResolution ) ) 
 		{
-			logFile << epoch << "," << trainingSetAccuracy << "," << generalizationSetAccuracy << "," << trainingSetMSE << "," << generalizationSetMSE << endl;
+			logFile << epoch << "," << trainingSetAccuracy << "," << generalizationSetAccuracy << endl;
 			lastEpochLogged = epoch;
 		}
 		
@@ -168,8 +150,8 @@ void neuralNetworkTrainer::trainNetwork( trainingDataSet* tSet )
 		if ( ceil(previousTAccuracy) != ceil(trainingSetAccuracy) || ceil(previousGAccuracy) != ceil(generalizationSetAccuracy) ) 
 		{	
 			cout << "Epoch :" << epoch;
-			cout << " TSet Acc:" << trainingSetAccuracy << "%, MSE: " << trainingSetMSE ;
-			cout << " GSet Acc:" << generalizationSetAccuracy << "%, MSE: " << generalizationSetMSE << endl;				
+			cout << " TSet Acc:" << trainingSetAccuracy << "%" ;
+			cout << " GSet Acc:" << generalizationSetAccuracy << "%" << endl;
 		}
 		
 		//once training set is complete increment epoch
@@ -177,18 +159,16 @@ void neuralNetworkTrainer::trainNetwork( trainingDataSet* tSet )
 
 	}//end while
 
-	//get validation set accuracy and MSE
+	//get validation set accuracy
 	validationSetAccuracy = NN->getSetAccuracy(tSet->validationSet);
-	validationSetMSE = NN->getSetMSE(tSet->validationSet);
 
 	//log end
-	logFile << epoch << "," << trainingSetAccuracy << "," << generalizationSetAccuracy << "," << trainingSetMSE << "," << generalizationSetMSE << endl << endl;
-	logFile << "Training Complete!!! - > Elapsed Epochs: " << epoch << " Validation Set Accuracy: " << validationSetAccuracy << " Validation Set MSE: " << validationSetMSE << endl;
+	logFile << epoch << "," << trainingSetAccuracy << "," << generalizationSetAccuracy << endl << endl;
+	logFile << "Training Complete!!! - > Elapsed Epochs: " << epoch << " Validation Set Accuracy: " << validationSetAccuracy << endl;
 			
-	//out validation accuracy and MSE
+	//out validation accuracy
 	cout << endl << "Training Complete!!! - > Elapsed Epochs: " << epoch << endl;
-	cout << " Validation Set Accuracy: " << validationSetAccuracy << endl;
-	cout << " Validation Set MSE: " << validationSetMSE << endl << endl;
+	cout << " Validation Set Accuracy: " << validationSetAccuracy << endl << endl;
 }
 /*******************************************************************
 * Run a single training epoch
@@ -197,7 +177,6 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 {
 	//incorrect patterns
 	double incorrectPatterns = 0;
-	double mse = 0;
 		
 	//for every training pattern
 	for ( int tp = 0; tp < (int) trainingSet.size(); tp++)
@@ -206,43 +185,20 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 		NN->feedForward( trainingSet[tp]->pattern );
 		backpropagate( trainingSet[tp]->target );	
 
-		//pattern correct flag
-		// bool patternCorrect = true;
-
-		// cout << "tp = " << tp << endl;
-		
-		//check all outputs from neural network against desired values
-		for ( int k = 0; k < NN->nOutput; k++ )
-		{					
-			//pattern incorrect if desired and output differ
-			// if ( NN->clampOutput( NN->outputNeurons[k] ) != trainingSet[tp]->target[k] ) patternCorrect = false;
-
-			// if (tp==0) {
-			// 	cout << "k = " << k << " Output: " << NN->outputNeurons[k] << " target = " << trainingSet[tp]->target[k] << endl;
-			// }
-			
-			//calculate MSE
-			mse += pow(( NN->outputNeurons[k] - trainingSet[tp]->target[k] ), 2);
-		}
-
-
 
 		int predicted = distance(NN->outputNeurons, max_element(NN->outputNeurons, NN->outputNeurons + NN->nOutput));
 		int expected = distance(trainingSet[tp]->target, max_element(trainingSet[tp]->target, trainingSet[tp]->target + NN->nOutput));
 		
 		if (predicted != expected) incorrectPatterns++;
-		
-		//if pattern is incorrect add to incorrect count
-		// if ( !patternCorrect ) incorrectPatterns++;	
+			
 		
 	}//end for
 
 	//if using batch learning - update the weights
 	if ( useBatch ) updateWeights();
 	
-	//update training accuracy and MSE
+	//update training accuracy
 	trainingSetAccuracy = 100 - (incorrectPatterns/trainingSet.size() * 100);
-	trainingSetMSE = mse / ( NN->nOutput * trainingSet.size() );
 }
 /*******************************************************************
 * Propagate errors back through NN and calculate delta values
@@ -260,7 +216,7 @@ void neuralNetworkTrainer::backpropagate( double* desiredOutputs )
 		for (int j = 0; j <= NN->nHidden; j++) 
 		{				
 			//calculate change in weight
-			if ( !useBatch ) deltaHiddenOutput[j][k] = learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k] + momentum * deltaHiddenOutput[j][k];
+			if ( !useBatch ) deltaHiddenOutput[j][k] = learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k];
 			else deltaHiddenOutput[j][k] += learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k];
 		}
 	}
@@ -276,7 +232,7 @@ void neuralNetworkTrainer::backpropagate( double* desiredOutputs )
 		for (int i = 0; i <= NN->nInput; i++)
 		{
 			//calculate change in weight 
-			if ( !useBatch ) deltaInputHidden[i][j] = learningRate * NN->inputNeurons[i] * hiddenErrorGradients[j] + momentum * deltaInputHidden[i][j];
+			if ( !useBatch ) deltaInputHidden[i][j] = learningRate * NN->inputNeurons[i] * hiddenErrorGradients[j];
 			else deltaInputHidden[i][j] += learningRate * NN->inputNeurons[i] * hiddenErrorGradients[j]; 
 
 		}

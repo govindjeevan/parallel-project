@@ -1,8 +1,6 @@
 /*******************************************************************
 * CSV Data File Reader and Training Set Creator
 * ------------------------------------------------------------------
-* Bobby Anguelov - takinginitiative.wordpress.com (2008)
-* MSN & email: banguelov@cs.up.ac.za
 ********************************************************************/
 
 #ifndef _DATAREADER
@@ -55,9 +53,6 @@ public:
 	}
 };
 
-//dataset retrieval approach enum
-enum { NONE, STATIC, GROWING, WINDOWING };
-
 //data reader class
 class dataReader
 {
@@ -74,27 +69,19 @@ private:
 	//current data set
 	trainingDataSet tSet;
 
-	//data set creation approach and total number of dataSets
-	int creationApproach;
+	//total number of dataSets
 	int numTrainingSets;
 	int trainingDataEndIndex;
-
-	//creation approach variables
-	double growingStepSize;			//step size - percentage of total set
-	int growingLastDataIndex;		//last index added to current dataSet
-	int windowingSetSize;			//initial size of set
-	int windowingStepSize;			//how many entries to move window by
-	int windowingStartIndex;		//window start index	
 	
 //public methods
 //----------------------------------------------------------------------------------------------------------------
 public:
 
-	dataReader(): creationApproach(NONE), numTrainingSets(-1) {}
+	dataReader(): numTrainingSets(-1) {}
 	~dataReader();
 	
 	bool loadDataFile( const char* filename, int nI, int nT );
-	void setCreationApproach( int approach, double param1 = -1, double param2 = -1 );
+	void setNumSets(int numSets);
 	int getNumTrainingSets();	
 	
 	trainingDataSet* getTrainingDataSet();
@@ -104,9 +91,7 @@ public:
 //----------------------------------------------------------------------------------------------------------------
 private:
 	
-	void createStaticDataSet();
-	void createGrowingDataSet();
-	void createWindowingDataSet();	
+	void createDataSet();	
 	void processLine( std::string &line );
 };
 
