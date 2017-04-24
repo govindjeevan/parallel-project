@@ -76,6 +76,8 @@ We want to use the GHC cluster machines which contain the NVIDIA GeForce GTX 108
 
 **Schedule** 
 
+Each task will be worked on concurrently by both partners.
+
 *April 17*  - Implement sequential neural network to classify images in the MNIST dataset.
 
 *April 27*  - Parallelize matrix multiplications required to train the neural network with CUDA
