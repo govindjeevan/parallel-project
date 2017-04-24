@@ -3,7 +3,7 @@
 
 ### CHECKPOINT REPORT
 
-As of April 24, we have completed the first task of our project as stated on the proposal, which was to implement a working sequential version of our neural network, trained on the MNIST handwritten image database. 
+As of April 24, we have completed the first task of our project as stated on the proposal, which was to implement a working sequential version of our neural network trained on the MNIST handwritten image database. 
 After coding a working version in Python and determining the optimal number of hidden units and the learning rate to classify handwritten images with 95% accuracy, we implemented a working C++ version. 
 
 With regard to our goals and deliverables stated in the proposal, our next task is to parallelize the matrix multiplications involved in training the neural network. We are about a day behind on this. We believe that we will still be able to complete the proposed deliverables that we "plan to achieve", and believe we will be able to complete half of what we "hope to achieve" or "nice to haves."
@@ -11,6 +11,8 @@ With regard to our goals and deliverables stated in the proposal, our next task 
 Our demo will include graphs reflecting the speedup and accuracy achieved by our parallel neural network. 
 
 Possible issues we may encounter include 
+
+We have updated our project schedule with a more detailed and revised plan of work for the coming weeks
 
 
 ### PROJECT PROPOSAL
@@ -76,9 +78,11 @@ We want to use the GHC cluster machines which contain the NVIDIA GeForce GTX 108
 
 *April 17*  - Implement sequential neural network to classify images in the MNIST dataset.
 
-*April 24*  - Parallelize matrix multiplications required to train the neural network with CUDA
+*April 27*  - Parallelize matrix multiplications required to train the neural network with CUDA
 
 *May 1* - Use OpenMP to parallelize computation across multiple threads of 8-core Xeon
+
+*May 4* - Modify with different activation functions and methods of calculating errors to determine optimal version
 
 *May 8* - Achieve linear speedup and the desired error rate
 
