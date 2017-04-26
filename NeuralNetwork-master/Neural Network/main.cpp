@@ -30,6 +30,7 @@ int main()
 
 	//create neural network
 	neuralNetwork nn(784,30,10);
+	nn.printCudaInfo();
 
 	//create neural network trainer
 	neuralNetworkTrainer nT( &nn );

@@ -45,6 +45,8 @@ public:
 	bool saveWeights(char* outputFilename);
 	double getSetAccuracy( std::vector<dataEntry*>& set );
 
+	void printCudaInfo();
+
 	//private methods
 	//--------------------------------------------------------------------------------------------
 
