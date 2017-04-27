@@ -11,47 +11,12 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <driver_functions.h>
-#include <curand.h>
-#include <curand_kernel.h>
 
 //include definition file
 #include "neuralNetwork.h"
 
 using namespace std;
 
-__global__ void
-weights1_kernel(double *device_output, int num_inputs, int num_hidden) {
-	int index = blockIdx.x * blockDim.x + threadIdx.x;
-
-	curandState state;
-	unsigned int seed = index;
-	curand_init(seed, 0, 0, &state);
-	float rand = curand_uniform(&state);
-    
-    int i = index/num_hidden;
-    int j = index - i*num_hidden;
-    if (index < num_inputs*num_hidden) {
-    	// device_output[i][j] = ( (( (double)(rand%1000)+1)/1000)/10 - 0.05);
-    	device_output[i*num_hidden + j] = ( (double)(rand)/10 - 0.05);
-    }
-}
-
-__global__ void
-weights2_kernel(double *device_output, int num_hidden, int num_outputs) {
-	int index = blockIdx.x * blockDim.x + threadIdx.x;
-
-	curandState state;
-	unsigned int seed = index;
-	curand_init(seed, 0, 0, &state);
-	float rand = curand_uniform(&state);
-
-    int i = index/num_outputs;
-    int j = index - i*num_outputs;
-    if (index < num_outputs*num_hidden) {
-    	// device_output[i][j] = ( (( (double)(rand%1000)+1)/1000)/10 - 0.05);
-    	device_output[i*num_outputs + j]  = ( (double)(rand)/10 - 0.05);
-    }
-}
 
 /*******************************************************************
 * Constructor
@@ -189,65 +154,27 @@ double neuralNetwork::getSetAccuracy( std::vector<dataEntry*>& set )
 ********************************************************************/
 void neuralNetwork::initializeWeights()
 {
-	printf("%f\n", wInputHidden[0][0]);
-	int threadsPerBlock = 256;
-    int blocks1 = ((nInput+1)*nHidden + threadsPerBlock - 1) / threadsPerBlock;
-    int blocks2 = (nOutput*(nHidden+1) + threadsPerBlock - 1) / threadsPerBlock;
-
-	double *device_output1;
-    cudaMalloc((void **)&device_output1, sizeof(double) * (nInput+1)*nHidden);
-    printf("HERE\n");
-	weights1_kernel<<<blocks1, threadsPerBlock>>>(device_output1, nInput+1, nHidden);
-	printf("WHOA\n");
-
-	double *device_output2;
-	cudaMalloc((void **)&device_output2, sizeof(double) * (nHidden+1)*nOutput);
-	printf("AGAIN\n");
-	weights2_kernel<<<blocks2, threadsPerBlock>>>(device_output2, nHidden+1, nOutput);
-	printf("WHOA AGAIN\n");
-
-	cudaThreadSynchronize();
-
-	printf("ABOUT TO COPY\n");
-	//for (int i =0; i<=nInput; i++) {
-		//cudaMemcpy(&wInputHidden[i], &device_output1[i*nHidden], sizeof(double)*nHidden, cudaMemcpyDeviceToHost);
-		//printf("%f\n", wInputHidden[i][0]);
-	cudaMemcpy(&wInputHidden, &device_output1, sizeof(double)*nHidden*(nInput+1), cudaMemcpyDeviceToHost);
-	//}
-	printf("DONE FIRST\n");
-
-	cudaFree(device_output1);
-
-	printf("ABOUT TO COPY 2\n");
-	//for (int i =0; i<=nHidden; i++) {
-		//cudaMemcpy(&wHiddenOutput[i], &device_output2[i*nOutput], sizeof(double)*nOutput, cudaMemcpyDeviceToHost);
-	cudaMemcpy(&wHiddenOutput, &device_output2, sizeof(double)*(nHidden+1)*nOutput, cudaMemcpyDeviceToHost);
-	//}
-	printf("DONE SECOND\n");
-
-	cudaFree(device_output2);
-
-	// //set weights between input and hidden 		
-	// //--------------------------------------------------------------------------------------------------------
-	// for(int i = 0; i <= nInput; i++)
-	// {		
-	// 	for(int j = 0; j < nHidden; j++) 
-	// 	{
-	// 		//set weights to random values
-	// 		wInputHidden[i][j] = ( (( (double)(rand()%1000)+1)/1000)/10 - 0.05);
-	// 	}
-	// }
+	//set weights between input and hidden 		
+	//--------------------------------------------------------------------------------------------------------
+	for(int i = 0; i <= nInput; i++)
+	{		
+		for(int j = 0; j < nHidden; j++) 
+		{
+			//set weights to random values
+			wInputHidden[i][j] = ( (( (double)(rand()%1000)+1)/1000)/10 - 0.05);
+		}
+	}
 	
-	// //set weights between input and hidden
-	// //--------------------------------------------------------------------------------------------------------
-	// for(int i = 0; i <= nHidden; i++)
-	// {		
-	// 	for(int j = 0; j < nOutput; j++) 
-	// 	{
-	// 		//set weights to random values
-	// 		wHiddenOutput[i][j] = ( (( (double)(rand()%1000)+1)/1000)/10 - 0.05);
-	// 	}
-	// }
+	//set weights between input and hidden
+	//--------------------------------------------------------------------------------------------------------
+	for(int i = 0; i <= nHidden; i++)
+	{		
+		for(int j = 0; j < nOutput; j++) 
+		{
+			//set weights to random values
+			wHiddenOutput[i][j] = ( (( (double)(rand()%1000)+1)/1000)/10 - 0.05);
+		}
+	}
 }
 /*******************************************************************
 * Activation Function
