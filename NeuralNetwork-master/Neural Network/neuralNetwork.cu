@@ -14,10 +14,41 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
+#include "CycleTimer.h"
+
 //include definition file
 #include "neuralNetwork.h"
 
 using namespace std;
+
+__global__ void
+forward_prop_w1(double *device_output, double *input, double *weights, int num_inputs, int num_hidden) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	// accessing in transposed manner
+	int row = index%num_inputs;
+	int col = index/num_inputs;
+
+    
+    if (index < num_inputs*num_hidden) {
+    	device_output[index] = input[row]*weights[row*num_hidden + col];
+    }
+}
+
+// __global__ void
+// forward_prop_w1(double *device_output, double *hidden, double *weights, int num_hidden, int num_outputs) {
+// 	int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+// 	// accessing in transposed manner
+// 	int row = index%num_hidden;
+// 	int col = index/num_hidden;
+
+    
+//     if (index < num_hidden*num_outputs) {
+//     	device_output[index] = hidden[row]*weights[row*num_outputs + col];
+//     }
+// }
+
 
 __global__ void
 weights1_kernel(double *device_output, int num_inputs, int num_hidden) {
@@ -28,11 +59,8 @@ weights1_kernel(double *device_output, int num_inputs, int num_hidden) {
 	curand_init(seed, 0, 0, &state);
 	float rand = curand_uniform(&state);
     
-    int i = index/num_hidden;
-    int j = index - i*num_hidden;
     if (index < num_inputs*num_hidden) {
-    	// device_output[i][j] = ( (( (double)(rand%1000)+1)/1000)/10 - 0.05);
-    	device_output[i*num_hidden + j] = ( (double)(rand)/10 - 0.05);
+    	device_output[index] = ( (double)(rand)/10 - 0.05);
     }
 }
 
@@ -45,11 +73,8 @@ weights2_kernel(double *device_output, int num_hidden, int num_outputs) {
 	curand_init(seed, 0, 0, &state);
 	float rand = curand_uniform(&state);
 
-    int i = index/num_outputs;
-    int j = index - i*num_outputs;
     if (index < num_outputs*num_hidden) {
-    	// device_output[i][j] = ( (( (double)(rand%1000)+1)/1000)/10 - 0.05);
-    	device_output[i*num_outputs + j]  = ( (double)(rand)/10 - 0.05);
+    	device_output[index]  = ( (double)(rand)/10 - 0.05);
     }
 }
 
@@ -78,16 +103,22 @@ neuralNetwork::neuralNetwork(int nI, int nH, int nO) : nInput(nI), nHidden(nH), 
 	//create weight lists (include bias neuron weights)
 	//--------------------------------------------------------------------------------------------------------
 	wInputHidden = new( double*[nInput + 1] );
+	wInputHidden[0] = new (double[(nInput + 1)*nHidden]);
+	for ( int i=1; i <= nInput; i++ ) {
+		wInputHidden[i] = wInputHidden[i-1] + nHidden;
+	}
 	for ( int i=0; i <= nInput; i++ ) 
 	{
-		wInputHidden[i] = new (double[nHidden]);
 		for ( int j=0; j < nHidden; j++ ) wInputHidden[i][j] = 0;		
 	}
 
 	wHiddenOutput = new( double*[nHidden + 1] );
+	wHiddenOutput[0] = new (double[(nHidden + 1)*nOutput]);
+	for ( int i=1; i <= nHidden; i++ ) {
+		wHiddenOutput[i] = wHiddenOutput[i-1] + nOutput;
+	}
 	for ( int i=0; i <= nHidden; i++ ) 
 	{
-		wHiddenOutput[i] = new (double[nOutput]);			
 		for ( int j=0; j < nOutput; j++ ) wHiddenOutput[i][j] = 0;		
 	}	
 	
@@ -189,65 +220,42 @@ double neuralNetwork::getSetAccuracy( std::vector<dataEntry*>& set )
 ********************************************************************/
 void neuralNetwork::initializeWeights()
 {
-	printf("%f\n", wInputHidden[0][0]);
+	double startTime = CycleTimer::currentSeconds();
+
 	int threadsPerBlock = 256;
     int blocks1 = ((nInput+1)*nHidden + threadsPerBlock - 1) / threadsPerBlock;
     int blocks2 = (nOutput*(nHidden+1) + threadsPerBlock - 1) / threadsPerBlock;
 
+    //set weights between input and hidden 		
+	//--------------------------------------------------------------------------------------------------------
 	double *device_output1;
-    cudaMalloc((void **)&device_output1, sizeof(double) * (nInput+1)*nHidden);
-    printf("HERE\n");
-	weights1_kernel<<<blocks1, threadsPerBlock>>>(device_output1, nInput+1, nHidden);
-	printf("WHOA\n");
+    cudaMalloc(&device_output1, sizeof(double) * (nInput+1)*nHidden);
 
-	double *device_output2;
-	cudaMalloc((void **)&device_output2, sizeof(double) * (nHidden+1)*nOutput);
-	printf("AGAIN\n");
-	weights2_kernel<<<blocks2, threadsPerBlock>>>(device_output2, nHidden+1, nOutput);
-	printf("WHOA AGAIN\n");
+	weights1_kernel<<<blocks1, threadsPerBlock>>>(device_output1, nInput+1, nHidden);
 
 	cudaThreadSynchronize();
 
-	printf("ABOUT TO COPY\n");
-	//for (int i =0; i<=nInput; i++) {
-		//cudaMemcpy(&wInputHidden[i], &device_output1[i*nHidden], sizeof(double)*nHidden, cudaMemcpyDeviceToHost);
-		//printf("%f\n", wInputHidden[i][0]);
-	cudaMemcpy(&wInputHidden, &device_output1, sizeof(double)*nHidden*(nInput+1), cudaMemcpyDeviceToHost);
-	//}
-	printf("DONE FIRST\n");
+	cudaMemcpy(wInputHidden[0], device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
 
 	cudaFree(device_output1);
 
-	printf("ABOUT TO COPY 2\n");
-	//for (int i =0; i<=nHidden; i++) {
-		//cudaMemcpy(&wHiddenOutput[i], &device_output2[i*nOutput], sizeof(double)*nOutput, cudaMemcpyDeviceToHost);
-	cudaMemcpy(&wHiddenOutput, &device_output2, sizeof(double)*(nHidden+1)*nOutput, cudaMemcpyDeviceToHost);
-	//}
-	printf("DONE SECOND\n");
+	//set weights between input and hidden
+	//--------------------------------------------------------------------------------------------------------
+	double *device_output2;
+	cudaMalloc(&device_output2, sizeof(double) * (nHidden+1)*nOutput);
+
+	weights2_kernel<<<blocks2, threadsPerBlock>>>(device_output2, nHidden+1, nOutput);
+
+	cudaThreadSynchronize();
+	
+	cudaMemcpy(wHiddenOutput[0], device_output2, (nHidden+1)*nOutput*sizeof(double), cudaMemcpyDeviceToHost);
 
 	cudaFree(device_output2);
 
-	// //set weights between input and hidden 		
-	// //--------------------------------------------------------------------------------------------------------
-	// for(int i = 0; i <= nInput; i++)
-	// {		
-	// 	for(int j = 0; j < nHidden; j++) 
-	// 	{
-	// 		//set weights to random values
-	// 		wInputHidden[i][j] = ( (( (double)(rand()%1000)+1)/1000)/10 - 0.05);
-	// 	}
-	// }
-	
-	// //set weights between input and hidden
-	// //--------------------------------------------------------------------------------------------------------
-	// for(int i = 0; i <= nHidden; i++)
-	// {		
-	// 	for(int j = 0; j < nOutput; j++) 
-	// 	{
-	// 		//set weights to random values
-	// 		wHiddenOutput[i][j] = ( (( (double)(rand()%1000)+1)/1000)/10 - 0.05);
-	// 	}
-	// }
+	double endTime = CycleTimer::currentSeconds();
+    double overallDuration = endTime - startTime;
+
+    printf("Time Taken:%f\n", overallDuration);
 }
 /*******************************************************************
 * Activation Function
@@ -268,22 +276,42 @@ void neuralNetwork::feedForward(double* pattern)
 		inputNeurons[i] = pattern[i];
 	}
 	
+
+	double *device_output1;
+    cudaMalloc(&device_output1, sizeof(double) * (nInput+1)*nHidden);
+    double *input;
+    cudaMalloc(&input, sizeof(double) * (nInput+1));
+    cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
+    double *w1;
+    cudaMalloc(&w1, sizeof(double) * (nInput+1)*nHidden);
+    cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+
+	forward_prop_w1<<<blocks1, threadsPerBlock>>>(device_output1, input, w1, nInput+1, nHidden);
+
+	cudaThreadSynchronize();
+
+	//inarray is the input scan array, end is the last elem address, result is empty array
+	cudaMemcpy(wInputHidden[0], device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+
+	cudaFree(device_output1);
 	//Calculate Hidden Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
-	for(int j=0; j < nHidden; j++)
-	{
-		//clear value
-		hiddenNeurons[j] = 0;				
+	// for(int j=0; j < nHidden; j++)
+	// {
+	// 	//clear value
+	// 	hiddenNeurons[j] = 0;				
 		
-		//get weighted sum of pattern and bias neuron
-		for( int i=0; i <= nInput; i++ ) {
-			hiddenNeurons[j] += inputNeurons[i] * wInputHidden[i][j];
-		}
+	// 	//get weighted sum of pattern and bias neuron
+	// 	for( int i=0; i <= nInput; i++ ) {
+	// 		hiddenNeurons[j] += inputNeurons[i] * wInputHidden[i][j];
+	// 	}
 		
-		//set to result of sigmoid
-		hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );			
-	}
+	// 	//set to result of sigmoid
+	// 	hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );			
+	// }
 	
+
+
 	//Calculating Output Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
 	for(int k=0; k < nOutput; k++)

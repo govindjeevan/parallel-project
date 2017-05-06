@@ -1,10 +1,1 @@
 Epoch,Training Set Accuracy, Generalization Set Accuracy,Training Set MSE, Generalization Set MSE
-0,25.6306,31.0167
-5,27.7278,35.2667
-10,27.5139,33.5417
-15,27.3083,32.05
-20,27.9278,31.75
-25,27.4806,35.4833
-30,27.6056,35.1417
-
-Training Complete!!! - > Elapsed Epochs: 30 Validation Set Accuracy: 33.9

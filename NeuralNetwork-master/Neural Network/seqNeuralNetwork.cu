@@ -12,6 +12,8 @@
 #include <cuda_runtime.h>
 #include <driver_functions.h>
 
+#include "CycleTimer.h"
+
 //include definition file
 #include "neuralNetwork.h"
 
@@ -43,22 +45,28 @@ neuralNetwork::neuralNetwork(int nI, int nH, int nO) : nInput(nI), nHidden(nH), 
 	//create weight lists (include bias neuron weights)
 	//--------------------------------------------------------------------------------------------------------
 	wInputHidden = new( double*[nInput + 1] );
+	wInputHidden[0] = new (double[(nInput + 1)*nHidden]);
+	for ( int i=1; i <= nInput; i++ ) {
+		wInputHidden[i] = wInputHidden[i-1] + nHidden;
+	}
 	for ( int i=0; i <= nInput; i++ ) 
 	{
-		wInputHidden[i] = new (double[nHidden]);
 		for ( int j=0; j < nHidden; j++ ) wInputHidden[i][j] = 0;		
 	}
 
 	wHiddenOutput = new( double*[nHidden + 1] );
+	wHiddenOutput[0] = new (double[(nHidden + 1)*nOutput]);
+	for ( int i=1; i <= nHidden; i++ ) {
+		wHiddenOutput[i] = wHiddenOutput[i-1] + nOutput;
+	}
 	for ( int i=0; i <= nHidden; i++ ) 
 	{
-		wHiddenOutput[i] = new (double[nOutput]);			
 		for ( int j=0; j < nOutput; j++ ) wHiddenOutput[i][j] = 0;		
 	}	
 	
 	//initialize weights
 	//--------------------------------------------------------------------------------------------------------
-	initializeWeights();			
+	initializeWeights();		
 }
 
 /*******************************************************************
@@ -154,6 +162,8 @@ double neuralNetwork::getSetAccuracy( std::vector<dataEntry*>& set )
 ********************************************************************/
 void neuralNetwork::initializeWeights()
 {
+	double startTime = CycleTimer::currentSeconds();
+
 	//set weights between input and hidden 		
 	//--------------------------------------------------------------------------------------------------------
 	for(int i = 0; i <= nInput; i++)
@@ -175,6 +185,10 @@ void neuralNetwork::initializeWeights()
 			wHiddenOutput[i][j] = ( (( (double)(rand()%1000)+1)/1000)/10 - 0.05);
 		}
 	}
+	double endTime = CycleTimer::currentSeconds();
+    double overallDuration = endTime - startTime;
+
+    printf("Time Taken:%f\n", overallDuration);
 }
 /*******************************************************************
 * Activation Function
