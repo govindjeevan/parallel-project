@@ -14,6 +14,9 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
+#include <thrust/scan.h>
+#include <thrust/execution_policy.h>
+
 #include "CycleTimer.h"
 
 //include definition file
@@ -31,23 +34,35 @@ forward_prop_w1(double *device_output, double *input, double *weights, int num_i
 
     
     if (index < num_inputs*num_hidden) {
+    	// printf("INPUT %f\n", input[row]);
+    	// printf("weights %f\n", weights[row*num_hidden + col]);
     	device_output[index] = input[row]*weights[row*num_hidden + col];
+    	// printf("DEVICE %f\n", device_output[index]);
     }
 }
 
-// __global__ void
-// forward_prop_w1(double *device_output, double *hidden, double *weights, int num_hidden, int num_outputs) {
-// 	int index = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void
+forward_prop_w2(double *device_output, double *hidden, double *weights, int num_hidden, int num_outputs) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-// 	// accessing in transposed manner
-// 	int row = index%num_hidden;
-// 	int col = index/num_hidden;
+	// accessing in transposed manner
+	int row = index%num_hidden;
+	int col = index/num_hidden;
 
     
-//     if (index < num_hidden*num_outputs) {
-//     	device_output[index] = hidden[row]*weights[row*num_outputs + col];
-//     }
-// }
+    if (index < num_hidden*num_outputs) {
+    	device_output[index] = hidden[row]*weights[row*num_outputs + col];
+    }
+}
+
+__global__ void
+fill_in_hidden(double *device_output, double *seg_scanned, int num_input, int num_hidden) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (index < num_hidden) {
+    	device_output[index] = seg_scanned[index*(num_input+1)+num_input];
+    }
+}
 
 
 __global__ void
@@ -276,6 +291,8 @@ void neuralNetwork::feedForward(double* pattern)
 		inputNeurons[i] = pattern[i];
 	}
 	
+	int threadsPerBlock = 256;
+    int blocks1 = ((nInput+1)*nHidden + threadsPerBlock - 1) / threadsPerBlock;
 
 	double *device_output1;
     cudaMalloc(&device_output1, sizeof(double) * (nInput+1)*nHidden);
@@ -284,14 +301,34 @@ void neuralNetwork::feedForward(double* pattern)
     cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
     double *w1;
     cudaMalloc(&w1, sizeof(double) * (nInput+1)*nHidden);
-    cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
 
 	forward_prop_w1<<<blocks1, threadsPerBlock>>>(device_output1, input, w1, nInput+1, nHidden);
 
 	cudaThreadSynchronize();
 
+	double bigArray[(nInput+1)*nHidden];
+	cudaMemcpy(bigArray, device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+	// cout << "HI 1 " << bigArray[20] << endl;
+	// cout << "HI 2 " << bigArray[21] << endl;
+	// cout << "HI 3 " << bigArray[22] << endl;
+	// cout << "HI 4 " << bigArray[23] << endl;
+	// cout << "HI 5 " << bigArray[24] << endl;
+
+	int keys[(nInput+1)*nHidden];
+	for (int t = 0; t<(nInput+1)*nHidden; t++) {
+		keys[t] = t / (nInput+1);
+	}
+
+	thrust::inclusive_scan_by_key(thrust::host, keys, keys + ((nInput+1)*nHidden), bigArray, bigArray);
+
+	for (int h = 0; h < nHidden; h++) {
+		outputNeurons[h] = activationFunction(bigArray[h*(nInput+1)+nInput]);
+	}
+
+
 	//inarray is the input scan array, end is the last elem address, result is empty array
-	cudaMemcpy(wInputHidden[0], device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+	// cudaMemcpy(wInputHidden[0], device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
 
 	cudaFree(device_output1);
 	//Calculate Hidden Layer values - include bias neuron
@@ -310,21 +347,51 @@ void neuralNetwork::feedForward(double* pattern)
 	// 	hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );			
 	// }
 	
+	double *device_output2;
+    cudaMalloc(&device_output2, sizeof(double) * (nHidden+1)*nOutput);
+    double *hidden;
+    cudaMalloc(&hidden, sizeof(double) * (nHidden+1));
+    cudaMemcpy(hidden, inputNeurons, sizeof(double) * (nHidden+1), cudaMemcpyHostToDevice);
+    double *w2;
+    cudaMalloc(&w2, sizeof(double) * (nHidden+1)*nOutput);
+    cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(double), cudaMemcpyHostToDevice);
 
+	forward_prop_w2<<<blocks1, threadsPerBlock>>>(device_output2, hidden, w2, nHidden+1, nOutput);
+
+	cudaThreadSynchronize();
+
+	double bigArray2[(nHidden+1)*nOutput];
+	cudaMemcpy(bigArray2, device_output2, (nHidden+1)*nOutput*sizeof(double), cudaMemcpyDeviceToHost);
+	// cout << "HI 1 " << bigArray[20] << endl;
+	// cout << "HI 2 " << bigArray[21] << endl;
+	// cout << "HI 3 " << bigArray[22] << endl;
+	// cout << "HI 4 " << bigArray[23] << endl;
+	// cout << "HI 5 " << bigArray[24] << endl;
+
+	int keys2[(nHidden+1)*nOutput];
+	for (int q = 0; q<(nHidden+1)*nOutput; q++) {
+		keys2[q] = q / (nHidden+1);
+	}
+
+	thrust::inclusive_scan_by_key(thrust::host, keys2, keys2 + ((nHidden+1)*nOutput), bigArray2, bigArray2);
+
+	for (int o = 0; o < nOutput; o++) {
+		outputNeurons[o] = activationFunction(bigArray2[o*(nHidden+1)+nHidden]);
+	}
 
 	//Calculating Output Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
-	for(int k=0; k < nOutput; k++)
-	{
-		//clear value
-		outputNeurons[k] = 0;				
+	// for(int k=0; k < nOutput; k++)
+	// {
+	// 	//clear value
+	// 	outputNeurons[k] = 0;				
 		
-		//get weighted sum of pattern and bias neuron
-		for( int j=0; j <= nHidden; j++ ) outputNeurons[k] += hiddenNeurons[j] * wHiddenOutput[j][k];
+	// 	//get weighted sum of pattern and bias neuron
+	// 	for( int j=0; j <= nHidden; j++ ) outputNeurons[k] += hiddenNeurons[j] * wHiddenOutput[j][k];
 		
-		//set to result of sigmoid
-		outputNeurons[k] = activationFunction( outputNeurons[k] );
-	}
+	// 	//set to result of sigmoid
+	// 	outputNeurons[k] = activationFunction( outputNeurons[k] );
+	// }
 }
 
 void neuralNetwork::printCudaInfo()
