@@ -188,7 +188,7 @@ void neuralNetwork::initializeWeights()
 	double endTime = CycleTimer::currentSeconds();
     double overallDuration = endTime - startTime;
 
-    printf("Time Taken:%f\n", overallDuration);
+    printf("Time Taken Seq:%f\n", overallDuration);
 }
 /*******************************************************************
 * Activation Function

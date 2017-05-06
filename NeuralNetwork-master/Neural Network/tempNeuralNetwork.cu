@@ -15,6 +15,9 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
+#include <thrust/scan.h>
+#include <thrust/execution_policy.h>
+
 #include "CycleTimer.h"
 
 //include definition file
@@ -22,32 +25,74 @@
 
 using namespace std;
 
-
-
 __global__ void
 forward_prop_w1(double *device_output, double *input, double *weights, int num_inputs, int num_hidden) {
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
-	// printf("ind %d\n", index);
 
-	// int row = index/num_inputs;
-	// int col = index%num_hidden;
+	// accessing in transposed manner
+	int row = index%num_inputs;
+	int col = index/num_inputs;
 
-
-	double temp = 0.0;
-
-	if (index<num_hidden) {
-		for (int i= 0; i<num_inputs; i++) {
-			temp += input[i] * weights[i*num_hidden + index];
-
-		}
-		// row is always 0 and col is [0, 30]
-		device_output[index] = 1/(1+exp(-1*temp));
-		//printf("temp: %f output %f\n", temp, device_output[index] );
-	}
-
-	
+    
+    if (index < num_inputs*num_hidden) {
+    	// printf("INPUT %f\n", input[row]);
+    	// printf("weights %f\n", weights[row*num_hidden + col]);
+    	device_output[index] = input[row]*weights[row*num_hidden + col];
+    	// printf("DEVICE %f\n", device_output[index]);
+    }
 }
 
+__global__ void
+forward_prop_w2(double *device_output, double *hidden, double *weights, int num_hidden, int num_outputs) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	// accessing in transposed manner
+	int row = index%num_hidden;
+	int col = index/num_hidden;
+
+    
+    if (index < num_hidden*num_outputs) {
+    	device_output[index] = hidden[row]*weights[row*num_outputs + col];
+    }
+}
+
+__global__ void
+fill_in_hidden(double *device_output, double *seg_scanned, int num_input, int num_hidden) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (index < num_hidden) {
+    	device_output[index] = seg_scanned[index*(num_input+1)+num_input];
+    }
+}
+
+
+__global__ void
+weights1_kernel(double *device_output, int num_inputs, int num_hidden) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	curandState state;
+	unsigned int seed = index;
+	curand_init(seed, 0, 0, &state);
+	float rand = curand_uniform(&state);
+    
+    if (index < num_inputs*num_hidden) {
+    	device_output[index] = ( (double)(rand)/10 - 0.05);
+    }
+}
+
+__global__ void
+weights2_kernel(double *device_output, int num_hidden, int num_outputs) {
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	curandState state;
+	unsigned int seed = index;
+	curand_init(seed, 0, 0, &state);
+	float rand = curand_uniform(&state);
+
+    if (index < num_outputs*num_hidden) {
+    	device_output[index]  = ( (double)(rand)/10 - 0.05);
+    }
+}
 
 /*******************************************************************
 * Constructor
@@ -95,7 +140,7 @@ neuralNetwork::neuralNetwork(int nI, int nH, int nO) : nInput(nI), nHidden(nH), 
 	
 	//initialize weights
 	//--------------------------------------------------------------------------------------------------------
-	initializeWeights();		
+	initializeWeights();			
 }
 
 /*******************************************************************
@@ -113,11 +158,7 @@ neuralNetwork::~neuralNetwork()
 	delete[] wInputHidden;
 
 	for (int j=0; j <= nHidden; j++) delete[] wHiddenOutput[j];
-	delete[] wHiddenOutput;
-
-	cudaFree(device_output1);
-	cudaFree(input);
-	cudaFree(w1);
+	delete[] wHiddenOutput;	
 }
 
 /*******************************************************************
@@ -195,16 +236,6 @@ double neuralNetwork::getSetAccuracy( std::vector<dataEntry*>& set )
 ********************************************************************/
 void neuralNetwork::initializeWeights()
 {
-	double startTime = CycleTimer::currentSeconds();
-
-	cudaMalloc(&device_output1, sizeof(double) * nHidden);
-    
-    cudaMalloc(&input, sizeof(double) * (nInput+1));
-
-    cudaMalloc(&w1, sizeof(double) * (nInput+1)*nHidden);
-
-	//set weights between input and hidden 		
-	//--------------------------------------------------------------------------------------------------------
 	for(int i = 0; i <= nInput; i++)
 	{		
 		for(int j = 0; j < nHidden; j++) 
@@ -224,10 +255,45 @@ void neuralNetwork::initializeWeights()
 			wHiddenOutput[i][j] = ( (( (double)(rand()%1000)+1)/1000)/10 - 0.05);
 		}
 	}
+
+	/*
+	double startTime = CycleTimer::currentSeconds();
+
+	int threadsPerBlock = 256;
+    int blocks1 = ((nInput+1)*nHidden + threadsPerBlock - 1) / threadsPerBlock;
+    int blocks2 = (nOutput*(nHidden+1) + threadsPerBlock - 1) / threadsPerBlock;
+
+    //set weights between input and hidden 		
+	//--------------------------------------------------------------------------------------------------------
+	double *device_output1;
+    cudaMalloc(&device_output1, sizeof(double) * (nInput+1)*nHidden);
+
+	weights1_kernel<<<blocks1, threadsPerBlock>>>(device_output1, nInput+1, nHidden);
+
+	cudaThreadSynchronize();
+
+	cudaMemcpy(wInputHidden[0], device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+
+	cudaFree(device_output1);
+
+	//set weights between input and hidden
+	//--------------------------------------------------------------------------------------------------------
+	double *device_output2;
+	cudaMalloc(&device_output2, sizeof(double) * (nHidden+1)*nOutput);
+
+	weights2_kernel<<<blocks2, threadsPerBlock>>>(device_output2, nHidden+1, nOutput);
+
+	cudaThreadSynchronize();
+	
+	cudaMemcpy(wHiddenOutput[0], device_output2, (nHidden+1)*nOutput*sizeof(double), cudaMemcpyDeviceToHost);
+
+	cudaFree(device_output2);
+
 	double endTime = CycleTimer::currentSeconds();
     double overallDuration = endTime - startTime;
 
-    printf("Time Taken Seq:%f\n", overallDuration);
+    printf("Initialize: %f\n", overallDuration);
+    */
 }
 /*******************************************************************
 * Activation Function
@@ -247,42 +313,117 @@ void neuralNetwork::feedForward(double* pattern)
 	for(int i = 0; i < nInput; i++) {
 		inputNeurons[i] = pattern[i];
 	}
-
-	
-    cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
+	/*
+	int threadsPerBlock = 256;
+    int blocks1 = ((nInput+1)*nHidden + threadsPerBlock - 1) / threadsPerBlock;
     
+	double *device_output1;
+    cudaMalloc(&device_output1, sizeof(double) * (nInput+1)*nHidden);
+    double *input;
+    cudaMalloc(&input, sizeof(double) * (nInput+1));
+    cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
+    double *w1;
+    cudaMalloc(&w1, sizeof(double) * (nInput+1)*nHidden);
     cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
 
-	forward_prop_w1<<<1, 30>>>(device_output1, input, w1, nInput+1, nHidden);
+	forward_prop_w1<<<blocks1, threadsPerBlock>>>(device_output1, input, w1, nInput+1, nHidden);
 
-	cudaDeviceSynchronize();
+	cudaThreadSynchronize();
 
-	cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+	double bigArray[(nInput+1)*nHidden];
+	cudaMemcpy(bigArray, device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+	// cout << "HI 1 " << bigArray[20] << endl;
+	// cout << "HI 2 " << bigArray[21] << endl;
+	// cout << "HI 3 " << bigArray[22] << endl;
+	// cout << "HI 4 " << bigArray[23] << endl;
+	// cout << "HI 5 " << bigArray[24] << endl;
 
-	// for (int j = 0 ; j < nHidden ; j++) {
-	// 	cout << " Hidden " << hiddenNeurons[j] << endl;
-	// }
+	int keys[(nInput+1)*nHidden];
+	for (int t = 0; t<(nInput+1)*nHidden; t++) {
+		keys[t] = t / (nInput+1);
+	}
 
+	thrust::inclusive_scan_by_key(thrust::host, keys, keys + ((nInput+1)*nHidden), bigArray, bigArray);
+
+	for (int h = 0; h < nHidden; h++) {
+		// cout << "big " << bigArray[h*(nInput+1)+nInput] << endl;
+		hiddenNeurons[h] = activationFunction(bigArray[h*(nInput+1)+nInput]);
+		// cout << "hidden " << hiddenNeurons[h] << endl;
+	}
 	
+	
+	cudaFree(device_output1);
+	cudaFree(input);
+	cudaFree(w1);
+	*/
+
+	//inarray is the input scan array, end is the last elem address, result is empty array
+	// cudaMemcpy(wInputHidden[0], device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+
+	 
 	//Calculate Hidden Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
-	// for(int j=0; j < nHidden; j++)
-	// {
-	// 	//clear value
-	// 	hiddenNeurons[j] = 0;				
+	#pragma omp parallel for
+	for(int j=0; j < nHidden; j++)
+	{
+		//clear value
+		hiddenNeurons[j] = 0;				
 		
-	// 	//get weighted sum of pattern and bias neuron
-	// 	for( int i=0; i <= nInput; i++ ) {
-	// 		hiddenNeurons[j] += inputNeurons[i] * wInputHidden[i][j];
-	// 	}
-	// 	// cout << "temp: " << hiddenNeurons[j] << endl;
-	// 	//set to result of sigmoid
-	// 	hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );			
-	// 	// cout << "output: " << hiddenNeurons[j] << endl;
-	// }
+		//get weighted sum of pattern and bias neuron
+
+		for( int i=0; i <= nInput; i++ ) {
+			hiddenNeurons[j] += inputNeurons[i] * wInputHidden[i][j];
+		}
+		// cout << "hidden big " << hiddenNeurons[j] << endl;
+		
+		//set to result of sigmoid
+		hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );		
+
+		// cout << "activate " << hiddenNeurons[j] << endl;	
+	}
 	
+	/*
+	double *device_output2;
+    cudaMalloc(&device_output2, sizeof(double) * (nHidden+1)*nOutput);
+    double *hidden;
+    cudaMalloc(&hidden, sizeof(double) * (nHidden+1));
+    cudaMemcpy(hidden, hiddenNeurons, sizeof(double) * (nHidden+1), cudaMemcpyHostToDevice);
+    double *w2;
+    cudaMalloc(&w2, sizeof(double) * (nHidden+1)*nOutput);
+    cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(double), cudaMemcpyHostToDevice);
+
+	forward_prop_w2<<<blocks1, threadsPerBlock>>>(device_output2, hidden, w2, nHidden+1, nOutput);
+
+	cudaThreadSynchronize();
+
+	double bigArray2[(nHidden+1)*nOutput];
+	cudaMemcpy(bigArray2, device_output2, (nHidden+1)*nOutput*sizeof(double), cudaMemcpyDeviceToHost);
+	// cout << "HI 1 " << bigArray[20] << endl;
+	// cout << "HI 2 " << bigArray[21] << endl;
+	// cout << "HI 3 " << bigArray[22] << endl;
+	// cout << "HI 4 " << bigArray[23] << endl;
+	// cout << "HI 5 " << bigArray[24] << endl;
+
+	int keys2[(nHidden+1)*nOutput];
+	for (int q = 0; q<(nHidden+1)*nOutput; q++) {
+		keys2[q] = q / (nHidden+1);
+	}
+
+	thrust::inclusive_scan_by_key(thrust::host, keys2, keys2 + ((nHidden+1)*nOutput), bigArray2, bigArray2);
+
+	for (int o = 0; o < nOutput; o++) {
+		outputNeurons[o] = activationFunction(bigArray2[o*(nHidden+1)+nHidden]);
+	}
+
+	cudaFree(device_output2);
+	cudaFree(hidden);
+	cudaFree(w2);
+
+	*/
+
 	//Calculating Output Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
+	// #pragma omp parallel for
 	for(int k=0; k < nOutput; k++)
 	{
 		//clear value

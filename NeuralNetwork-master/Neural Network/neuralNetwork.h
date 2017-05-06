@@ -27,6 +27,10 @@ private:
 	//weights
 	double** wInputHidden;
 	double** wHiddenOutput;
+
+	double *device_output1;
+	double *input;
+	double *w1;
 		
 	//Friends
 	//--------------------------------------------------------------------------------------------

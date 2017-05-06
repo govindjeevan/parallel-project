@@ -1,11 +1,11 @@
 EXECUTABLE := run_nn
 
-CU_FILES   := neuralNetwork.cu
+CU_FILES   := neuralNetwork.cu neuralNetworkTrainer.cu
 # CU_FILES   := seqNeuralNetwork.cu
 
 CU_DEPS    :=
 
-CC_FILES   := main.cpp dataReader.cpp neuralNetworkTrainer.cpp
+CC_FILES   := main.cpp dataReader.cpp
 
 # LOGS	   := logs
 
@@ -14,7 +14,7 @@ CC_FILES   := main.cpp dataReader.cpp neuralNetworkTrainer.cpp
 ARCH=$(shell uname | sed -e 's/-.*//g')
 OBJDIR=objs
 CXX=g++ -m64
-CXXFLAGS=-O3 -Wall -g
+CXXFLAGS=-fopenmp -O3 -Wall -g
 HOSTNAME=$(shell hostname)
 
 LIBS       :=
