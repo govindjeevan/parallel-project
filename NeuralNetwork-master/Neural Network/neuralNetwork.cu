@@ -293,7 +293,7 @@ void neuralNetwork::feedForward(double* pattern)
 	
 	int threadsPerBlock = 256;
     int blocks1 = ((nInput+1)*nHidden + threadsPerBlock - 1) / threadsPerBlock;
-
+    
 	double *device_output1;
     cudaMalloc(&device_output1, sizeof(double) * (nInput+1)*nHidden);
     double *input;
@@ -323,14 +323,19 @@ void neuralNetwork::feedForward(double* pattern)
 	thrust::inclusive_scan_by_key(thrust::host, keys, keys + ((nInput+1)*nHidden), bigArray, bigArray);
 
 	for (int h = 0; h < nHidden; h++) {
-		outputNeurons[h] = activationFunction(bigArray[h*(nInput+1)+nInput]);
+		// cout << "big " << bigArray[h*(nInput+1)+nInput] << endl;
+		hiddenNeurons[h] = activationFunction(bigArray[h*(nInput+1)+nInput]);
+		// cout << "hidden " << hiddenNeurons[h] << endl;
 	}
 
-
+	
+	cudaFree(device_output1);
+	cudaFree(input);
+	cudaFree(w1);
 	//inarray is the input scan array, end is the last elem address, result is empty array
 	// cudaMemcpy(wInputHidden[0], device_output1, (nInput+1)*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
 
-	cudaFree(device_output1);
+	 
 	//Calculate Hidden Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
 	// for(int j=0; j < nHidden; j++)
@@ -342,16 +347,19 @@ void neuralNetwork::feedForward(double* pattern)
 	// 	for( int i=0; i <= nInput; i++ ) {
 	// 		hiddenNeurons[j] += inputNeurons[i] * wInputHidden[i][j];
 	// 	}
+	// 	// cout << "hidden big " << hiddenNeurons[j] << endl;
 		
 	// 	//set to result of sigmoid
-	// 	hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );			
+	// 	hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );		
+
+	// 	// cout << "activate " << hiddenNeurons[j] << endl;	
 	// }
 	
 	double *device_output2;
     cudaMalloc(&device_output2, sizeof(double) * (nHidden+1)*nOutput);
     double *hidden;
     cudaMalloc(&hidden, sizeof(double) * (nHidden+1));
-    cudaMemcpy(hidden, inputNeurons, sizeof(double) * (nHidden+1), cudaMemcpyHostToDevice);
+    cudaMemcpy(hidden, hiddenNeurons, sizeof(double) * (nHidden+1), cudaMemcpyHostToDevice);
     double *w2;
     cudaMalloc(&w2, sizeof(double) * (nHidden+1)*nOutput);
     cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(double), cudaMemcpyHostToDevice);
@@ -378,6 +386,10 @@ void neuralNetwork::feedForward(double* pattern)
 	for (int o = 0; o < nOutput; o++) {
 		outputNeurons[o] = activationFunction(bigArray2[o*(nHidden+1)+nHidden]);
 	}
+
+	cudaFree(device_output2);
+	cudaFree(hidden);
+	cudaFree(w2);
 
 	//Calculating Output Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
