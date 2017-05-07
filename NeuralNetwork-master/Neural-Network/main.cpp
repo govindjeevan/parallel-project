@@ -14,11 +14,14 @@
 #include "neuralNetwork.h"
 #include "neuralNetworkTrainer.h"
 
+#include "CycleTimer.h"
+
 //use standard namespace
 using namespace std;
 
 int main()
-{		
+{	
+	double startTime = CycleTimer::currentSeconds();
 	//seed random number generator
 	srand( (unsigned int) time(0) );
 	
@@ -35,7 +38,7 @@ int main()
 	//create neural network trainer
 	neuralNetworkTrainer nT( &nn );
 	nT.setTrainingParameters(1.2, false);
-	nT.setStoppingConditions(30, 100);
+	nT.setStoppingConditions(100, 100);
 	nT.enableLogging("log.csv", 5);
 	
 	//train neural network on data sets
@@ -46,6 +49,11 @@ int main()
 
 	//save the weights
 	nn.saveWeights("weights.csv");
+
+	double endTime = CycleTimer::currentSeconds();
+    double totalTime = endTime - startTime;
+
+    cout << "TOTAL TIME: " << totalTime << endl;
 		
 	cout << endl << endl << "-- END OF PROGRAM --" << endl;
 	char c; cin >> c;

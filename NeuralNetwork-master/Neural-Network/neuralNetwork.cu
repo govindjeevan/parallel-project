@@ -121,7 +121,7 @@ neuralNetwork::neuralNetwork(int nI, int nH, int nO) : nInput(nI), nHidden(nH), 
 	for ( int i=0; i <= nHidden; i++ ) 
 	{
 		for ( int j=0; j < nOutput; j++ ) wHiddenOutput[i][j] = 0;		
-	}	
+	}
 	
 	//initialize weights
 	//--------------------------------------------------------------------------------------------------------
@@ -148,6 +148,10 @@ neuralNetwork::~neuralNetwork()
 	cudaFree(device_output1);
 	cudaFree(input);
 	cudaFree(w1);
+
+	cudaFree(device_output2);
+	cudaFree(hidden);
+	cudaFree(w2);
 }
 
 /*******************************************************************
@@ -228,13 +232,16 @@ void neuralNetwork::initializeWeights()
 	double startTime = CycleTimer::currentSeconds();
 
 	cudaMalloc(&device_output1, sizeof(double) * nHidden);
-    
     cudaMalloc(&input, sizeof(double) * (nInput+1));
-
     cudaMalloc(&w1, sizeof(double) * (nInput+1)*nHidden);
+
+    cudaMalloc(&device_output2, sizeof(double) * nOutput);
+    cudaMalloc(&hidden, sizeof(double) * (nHidden+1));
+    cudaMalloc(&w2, sizeof(double) * (nHidden+1)*nOutput);
 
 	//set weights between input and hidden 		
 	//--------------------------------------------------------------------------------------------------------
+	#pragma omp for 
 	for(int i = 0; i <= nInput; i++)
 	{		
 		for(int j = 0; j < nHidden; j++) 
@@ -278,23 +285,24 @@ void neuralNetwork::feedForward(double* pattern)
 		inputNeurons[i] = pattern[i];
 	}
 
-	double startTime = CycleTimer::currentSeconds();
-	dim3 blockDim(1024, 1);
-    dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+	// double startTime = CycleTimer::currentSeconds();
+
+	// dim3 blockDim(1024, 1);
+ //    dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	
-    cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
-    double endTime1 = CycleTimer::currentSeconds();
+ //    cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
+ //    double endTime1 = CycleTimer::currentSeconds();
     
-    cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
-    double endTime2 = CycleTimer::currentSeconds();
+ //    cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
+ //    double endTime2 = CycleTimer::currentSeconds();
 
-	forward_prop_w1<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
+	// forward_prop_w1<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
 
-	cudaThreadSynchronize();
-	double endTime3 = CycleTimer::currentSeconds();
+	// cudaThreadSynchronize();
+	// double endTime3 = CycleTimer::currentSeconds();
 
-	cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(double), cudaMemcpyDeviceToHost);
-	double endTime4 = CycleTimer::currentSeconds();
+	// cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+	// double endTime4 = CycleTimer::currentSeconds();
 
 	// double time1 = endTime1 - startTime;
 	// double time2 = endTime2 - endTime1;
@@ -309,40 +317,64 @@ void neuralNetwork::feedForward(double* pattern)
 
     //Calculate Hidden Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
-	// #pragma omp for 
-	// for(int j=0; j < nHidden; j++)
-	// {
-	// 	//clear value
-	// 	hiddenNeurons[j] = 0;				
-	//  double temp = 0.0;
-		
-	// 	//get weighted sum of pattern and bias neuron
-	//  #pragma omp for reduction(+ : temp)
-	// 	for( int i=0; i <= nInput; i++ ) {
-	// 		temp += inputNeurons[i] * wInputHidden[i][j];
-	// 	}
-	// 	// cout << "temp: " << hiddenNeurons[j] << endl;
-	// 	//set to result of sigmoid
-	// 	hiddenNeurons[j] = activationFunction( temp );			
-	// 	// cout << "output: " << hiddenNeurons[j] << endl;
-	// }
 	
-	// double endTime1 = CycleTimer::currentSeconds();
-	// printf("Time:%f\n", endTime1 - startTime);
-
-	//Calculating Output Layer values - include bias neuron
-	//--------------------------------------------------------------------------------------------------------
-	for(int k=0; k < nOutput; k++)
+	#pragma omp parallel 
 	{
-		//clear value
-		outputNeurons[k] = 0;				
-		
-		//get weighted sum of pattern and bias neuron
-		for( int j=0; j <= nHidden; j++ ) outputNeurons[k] += hiddenNeurons[j] * wHiddenOutput[j][k];
-		
-		//set to result of sigmoid
-		outputNeurons[k] = activationFunction( outputNeurons[k] );
+		double temp = 0.0;
+		#pragma omp for //schedule(static, 16)
+		for(int j=0; j < nHidden; j++)
+		{
+			temp = 0.0;
+			//clear value
+			hiddenNeurons[j] = 0;	
+			//get weighted sum of pattern and bias neuron
+		 	// #pragma omp parallel for reduction(+ : temp)
+			for( int i=0; i <= nInput; i++ ) {
+				temp += inputNeurons[i] * wInputHidden[i][j];
+			}
+			// cout << "temp: " << hiddenNeurons[j] << endl;
+			//set to result of sigmoid
+			hiddenNeurons[j] = activationFunction( temp );			
+			// cout << "output: " << hiddenNeurons[j] << endl;
+		}
+	
+		// double endTime1 = CycleTimer::currentSeconds();
+		// printf("Time:%f\n", endTime1 - startTime);
+		//Calculating Output Layer values - include bias neuron
+		//--------------------------------------------------------------------------------------------------------
+		#pragma omp for //schedule(static, 16)//reduction(+ : temp)
+		for(int k=0; k < nOutput; k++)
+		{
+			temp = 0.0;
+			//clear value
+			outputNeurons[k] = 0;			
+					
+			//get weighted sum of pattern and bias neuron
+			// #pragma omp for //reduction(+ : temp)
+			for( int j=0; j <= nHidden; j++ ) {
+				temp += hiddenNeurons[j] * wHiddenOutput[j][k];
+			}
+			//set to result of sigmoid
+			outputNeurons[k] = activationFunction( temp );
+		}
 	}
+	
+
+ //    dim3 gridDim2(nOutput);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+	
+ //    cudaMemcpy(hidden, hiddenNeurons, sizeof(double) * (nHidden+1), cudaMemcpyHostToDevice);
+ //    // double endTime1 = CycleTimer::currentSeconds();
+    
+ //    cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(double), cudaMemcpyHostToDevice);
+ //    // double endTime2 = CycleTimer::currentSeconds();
+
+	// forward_prop_w2<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput);
+
+	// cudaThreadSynchronize();
+	// // double endTime3 = CycleTimer::currentSeconds();
+
+	// cudaMemcpy(outputNeurons, device_output2, nOutput*sizeof(double), cudaMemcpyDeviceToHost);
+	// double endTime4 = CycleTimer::currentSeconds();
 }
 
 void neuralNetwork::printCudaInfo()

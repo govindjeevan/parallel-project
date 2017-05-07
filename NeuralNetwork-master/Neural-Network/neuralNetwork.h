@@ -31,6 +31,10 @@ private:
 	double *device_output1;
 	double *input;
 	double *w1;
+
+	double *device_output2;
+	double *hidden;
+	double *w2;
 		
 	//Friends
 	//--------------------------------------------------------------------------------------------
