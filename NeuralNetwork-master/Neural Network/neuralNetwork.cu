@@ -17,6 +17,10 @@
 
 #include "CycleTimer.h"
 
+#define BLOCKSIZE  1024
+#define SCAN_BLOCK_DIM  BLOCKSIZE
+#include "exclusiveScan.cu_inl"
+
 //include definition file
 #include "neuralNetwork.h"
 
@@ -26,24 +30,48 @@ using namespace std;
 
 __global__ void
 forward_prop_w1(double *device_output, double *input, double *weights, int num_inputs, int num_hidden) {
-	int index = blockIdx.x * blockDim.x + threadIdx.x;
-	// printf("ind %d\n", index);
+	// int index = blockIdx.x * blockDim.x + threadIdx.x;
+	int linearThreadIndex = threadIdx.x;
+	int unit = blockIdx.x;
+	// printf("unit %d\n", unit);
 
 	// int row = index/num_inputs;
 	// int col = index%num_hidden;
+    __shared__ double prefixSumInput[BLOCKSIZE];
+    __shared__ double prefixSumOutput[BLOCKSIZE];
+    __shared__ double prefixSumScratch[2 * BLOCKSIZE];
+
+    if (linearThreadIndex < num_inputs) {
+    	// printf("input %f\n", input[linearThreadIndex]);
+    	// printf("weight %f\n", weights[linearThreadIndex*num_hidden + unit]);
+    	prefixSumInput[linearThreadIndex] = input[linearThreadIndex] * weights[linearThreadIndex*num_hidden + unit];
+    	// printf("input %f\n", prefixSumInput[linearThreadIndex]);
+    }
+
+    __syncthreads();
+
+    sharedMemExclusiveScan(linearThreadIndex, prefixSumInput, prefixSumOutput, 
+                            prefixSumScratch, BLOCKSIZE);
+
+    __syncthreads();
+
+    if (linearThreadIndex == 0) {
+    	device_output[unit] = prefixSumOutput[num_inputs];
+    	// printf("output %f\n", prefixSumOutput[num_inputs]);
+    }
 
 
-	double temp = 0.0;
+	// double temp = 0.0;
 
-	if (index<num_hidden) {
-		for (int i= 0; i<num_inputs; i++) {
-			temp += input[i] * weights[i*num_hidden + index];
+	// if (index<num_hidden) {
+	// 	for (int i = 0; i<num_inputs; i++) {
+	// 		temp += input[i] * weights[i*num_hidden + index];
 
-		}
-		// row is always 0 and col is [0, 30]
-		device_output[index] = 1/(1+exp(-1*temp));
-		//printf("temp: %f output %f\n", temp, device_output[index] );
-	}
+	// 	}
+	// 	// row is always 0 and col is [0, 30)
+	// 	device_output[index] = 1/(1+exp(-1*temp));
+	// 	// printf("temp: %f output %f\n", temp, device_output[index] );
+	// }
 
 	
 }
@@ -248,23 +276,36 @@ void neuralNetwork::feedForward(double* pattern)
 		inputNeurons[i] = pattern[i];
 	}
 
+	double startTime = CycleTimer::currentSeconds();
+	dim3 blockDim(1024, 1);
+    dim3 gridDim(30);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	
     cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
+    double endTime1 = CycleTimer::currentSeconds();
     
     cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
+    double endTime2 = CycleTimer::currentSeconds();
 
-	forward_prop_w1<<<1, 30>>>(device_output1, input, w1, nInput+1, nHidden);
+	forward_prop_w1<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
 
-	cudaDeviceSynchronize();
+	cudaThreadSynchronize();
+	double endTime3 = CycleTimer::currentSeconds();
 
 	cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+	double endTime4 = CycleTimer::currentSeconds();
 
-	// for (int j = 0 ; j < nHidden ; j++) {
-	// 	cout << " Hidden " << hiddenNeurons[j] << endl;
-	// }
+	// double time1 = endTime1 - startTime;
+	// double time2 = endTime2 - endTime1;
+	// double time3 = endTime3 - endTime2;
+	// double time4 = endTime4 - endTime3;
 
-	
-	//Calculate Hidden Layer values - include bias neuron
+ //    printf("Time 1:%f\n", time1);
+ //    printf("Time 2:%f\n", time2);
+ //    printf("Time 3:%f\n", time3);
+ //    printf("Time 4:%f\n", time4);
+
+
+    //Calculate Hidden Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
 	// for(int j=0; j < nHidden; j++)
 	// {
@@ -281,6 +322,9 @@ void neuralNetwork::feedForward(double* pattern)
 	// 	// cout << "output: " << hiddenNeurons[j] << endl;
 	// }
 	
+	// double endTime1 = CycleTimer::currentSeconds();
+	// printf("Time:%f\n", endTime1 - startTime);
+
 	//Calculating Output Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
 	for(int k=0; k < nOutput; k++)
