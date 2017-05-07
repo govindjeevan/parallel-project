@@ -29,7 +29,7 @@ using namespace std;
 
 
 __global__ void
-forward_prop_w1(double *device_output, double *input, double *weights, int num_inputs, int num_hidden) {
+forward_prop_kernel(double *device_output, double *input, double *weights, int num_first, int num_second) {
 	int linearThreadIndex = threadIdx.x;
 	int unit = blockIdx.x;
 
@@ -37,8 +37,8 @@ forward_prop_w1(double *device_output, double *input, double *weights, int num_i
     __shared__ double prefixSumOutput[BLOCKSIZE];
     __shared__ double prefixSumScratch[2 * BLOCKSIZE];
 
-    if (linearThreadIndex < num_inputs) {
-    	prefixSumInput[linearThreadIndex] = input[linearThreadIndex] * weights[linearThreadIndex*num_hidden + unit];
+    if (linearThreadIndex < num_first) {
+    	prefixSumInput[linearThreadIndex] = input[linearThreadIndex] * weights[linearThreadIndex*num_second + unit];
     }
 
     __syncthreads();
@@ -48,33 +48,8 @@ forward_prop_w1(double *device_output, double *input, double *weights, int num_i
 
     __syncthreads();
 
-    if (linearThreadIndex == 0 && unit < num_hidden) {
-    	device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_inputs]));
-    }
-}
-
-__global__ void
-forward_prop_w2(double *device_output, double *input, double *weights, int num_hidden, int num_outputs) {
-	int linearThreadIndex = threadIdx.x;
-	int unit = blockIdx.x;
-
-    __shared__ double prefixSumInput[BLOCKSIZE];
-    __shared__ double prefixSumOutput[BLOCKSIZE];
-    __shared__ double prefixSumScratch[2 * BLOCKSIZE];
-
-    if (linearThreadIndex < num_hidden) {
-    	prefixSumInput[linearThreadIndex] = input[linearThreadIndex] * weights[linearThreadIndex*num_outputs + unit];
-    }
-
-    __syncthreads();
-
-    sharedMemExclusiveScan(linearThreadIndex, prefixSumInput, prefixSumOutput, 
-                            prefixSumScratch, BLOCKSIZE);
-
-    __syncthreads();
-
-    if (linearThreadIndex == 0 && unit < num_outputs) {
-    	device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_hidden]));
+    if (linearThreadIndex == 0 && unit < num_second) {
+    	device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_first]));
     }
 }
 
@@ -145,6 +120,7 @@ neuralNetwork::~neuralNetwork()
 	for (int j=0; j <= nHidden; j++) delete[] wHiddenOutput[j];
 	delete[] wHiddenOutput;
 
+	/*	
 	cudaFree(device_output1);
 	cudaFree(input);
 	cudaFree(w1);
@@ -152,11 +128,12 @@ neuralNetwork::~neuralNetwork()
 	cudaFree(device_output2);
 	cudaFree(hidden);
 	cudaFree(w2);
+	*/
 }
 
 /*******************************************************************
 * Save Neuron Weights
-********************************************************************/
+*******************************************************************/
 bool neuralNetwork::saveWeights(char* filename)
 {
 	//open file for reading
@@ -231,6 +208,7 @@ void neuralNetwork::initializeWeights()
 {
 	double startTime = CycleTimer::currentSeconds();
 
+	/*
 	cudaMalloc(&device_output1, sizeof(double) * nHidden);
     cudaMalloc(&input, sizeof(double) * (nInput+1));
     cudaMalloc(&w1, sizeof(double) * (nInput+1)*nHidden);
@@ -238,10 +216,10 @@ void neuralNetwork::initializeWeights()
     cudaMalloc(&device_output2, sizeof(double) * nOutput);
     cudaMalloc(&hidden, sizeof(double) * (nHidden+1));
     cudaMalloc(&w2, sizeof(double) * (nHidden+1)*nOutput);
+    */
 
 	//set weights between input and hidden 		
 	//--------------------------------------------------------------------------------------------------------
-	#pragma omp for 
 	for(int i = 0; i <= nInput; i++)
 	{		
 		for(int j = 0; j < nHidden; j++) 
@@ -286,24 +264,24 @@ void neuralNetwork::feedForward(double* pattern)
 	}
 
 	// double startTime = CycleTimer::currentSeconds();
-
-	// dim3 blockDim(1024, 1);
- //    dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+	/*
+	dim3 blockDim(1024, 1);
+    dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	
- //    cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
- //    double endTime1 = CycleTimer::currentSeconds();
+    cudaMemcpy(input, inputNeurons, sizeof(double) * (nInput+1), cudaMemcpyHostToDevice);
+    // double endTime1 = CycleTimer::currentSeconds();
     
- //    cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
- //    double endTime2 = CycleTimer::currentSeconds();
+    cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
+    // double endTime2 = CycleTimer::currentSeconds();
 
-	// forward_prop_w1<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
+	forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
 
-	// cudaThreadSynchronize();
+	cudaThreadSynchronize();
 	// double endTime3 = CycleTimer::currentSeconds();
 
-	// cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+	cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(double), cudaMemcpyDeviceToHost);
 	// double endTime4 = CycleTimer::currentSeconds();
-
+	*/
 	// double time1 = endTime1 - startTime;
 	// double time2 = endTime2 - endTime1;
 	// double time3 = endTime3 - endTime2;
@@ -320,7 +298,9 @@ void neuralNetwork::feedForward(double* pattern)
 	
 	#pragma omp parallel 
 	{
+		
 		double temp = 0.0;
+		
 		#pragma omp for //schedule(static, 16)
 		for(int j=0; j < nHidden; j++)
 		{
@@ -337,6 +317,7 @@ void neuralNetwork::feedForward(double* pattern)
 			hiddenNeurons[j] = activationFunction( temp );			
 			// cout << "output: " << hiddenNeurons[j] << endl;
 		}
+		
 	
 		// double endTime1 = CycleTimer::currentSeconds();
 		// printf("Time:%f\n", endTime1 - startTime);
@@ -368,7 +349,7 @@ void neuralNetwork::feedForward(double* pattern)
  //    cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(double), cudaMemcpyHostToDevice);
  //    // double endTime2 = CycleTimer::currentSeconds();
 
-	// forward_prop_w2<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput);
+	// forward_prop_kernel<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput);
 
 	// cudaThreadSynchronize();
 	// // double endTime3 = CycleTimer::currentSeconds();

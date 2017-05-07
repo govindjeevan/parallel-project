@@ -55,8 +55,8 @@ bool dataReader::loadDataFile( const char* filename, int nI, int nT )
 		random_shuffle(data.begin(), data.end());
 
 		//split data set
-		trainingDataEndIndex = (int) ( 0.6 * data.size() );
-		int gSize = (int) ( ceil(0.2 * data.size()) );
+		trainingDataEndIndex = (int) ( 0.85 * data.size() );
+		int gSize = (int) ( ceil(0.05 * data.size()) );
 		int vSize = (int) ( data.size() - trainingDataEndIndex - gSize );
 							
 		//generalization set
