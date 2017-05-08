@@ -17,7 +17,7 @@ class neuralNetwork
 private:
 
 	//number of neurons
-	int nInput, nHidden, nOutput;
+	int nInput, nHidden, nOutput, batchSize;
 	
 	//neurons
 	double* inputNeurons;
@@ -46,7 +46,7 @@ private:
 public:
 
 	//constructor & destructor
-	neuralNetwork(int numInput, int numHidden, int numOutput);
+	neuralNetwork(int numInput, int numHidden, int numOutput, int batchSize);
 	~neuralNetwork();
 
 	//weight operations
@@ -63,6 +63,7 @@ private:
 	void initializeWeights();
 	inline double activationFunction( double x );
 	void feedForward( double* pattern );
+	void feedForwardBatch(std::vector<double*> patternVector);
 	
 };
 

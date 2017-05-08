@@ -27,7 +27,7 @@
 using namespace std;
 
 
-
+/*
 __global__ void
 forward_prop_kernel(double *device_output, double *input, double *weights, int num_first, int num_second) {
 	int linearThreadIndex = threadIdx.x;
@@ -52,29 +52,80 @@ forward_prop_kernel(double *device_output, double *input, double *weights, int n
     	device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_first]));
     }
 }
+*/
+
+// first, second -> input=input+1, nhidden
+// first, second -> hidden=hidden+1, noutput
+__global__ void
+forward_prop_kernel(double *device_output, double *input, double *weights, int num_first, int num_second, int batchSize) {
+	int linearThreadIndex = threadIdx.x;
+	// PRINT LINEAR THREAD INDEX TO DEBUG 
+	int unit = blockIdx.x%num_second;
+	int batch = blockIdx.x/num_second;
+
+    __shared__ double prefixSumInput[BLOCKSIZE];
+    __shared__ double prefixSumOutput[BLOCKSIZE];
+    __shared__ double prefixSumScratch[2 * BLOCKSIZE];
+
+    if (linearThreadIndex < num_first) {
+    	prefixSumInput[linearThreadIndex] = input[batch*linearThreadIndex] * weights[linearThreadIndex*num_second + unit];
+    }
+
+    __syncthreads();
+
+    sharedMemExclusiveScan(linearThreadIndex, prefixSumInput, prefixSumOutput, 
+                            prefixSumScratch, BLOCKSIZE);
+
+    __syncthreads();
+
+    if (linearThreadIndex == 0 && unit < num_second) {
+    	device_output[batch*unit] = 1/(1+exp(-1*prefixSumOutput[num_first]));
+    }
+}
 
 
 /*******************************************************************
 * Constructor
 ********************************************************************/
-neuralNetwork::neuralNetwork(int nI, int nH, int nO) : nInput(nI), nHidden(nH), nOutput(nO)
+neuralNetwork::neuralNetwork(int nI, int nH, int nO, int bS) : nInput(nI), nHidden(nH), nOutput(nO), batchSize(bS)
 {				
 	//create neuron lists
 	//--------------------------------------------------------------------------------------------------------
-	inputNeurons = new( double[nInput + 1] );
-	for ( int i=0; i < nInput; i++ ) inputNeurons[i] = 0;
+	inputNeurons = new( double[batchSize*(nInput + 1)] );
+	int offset = 0;
+	for ( int i=0; i < batchSize*(nInput+1); i++ ) {
+		offset = i/(nInput+1);
+		if (i && ((i+offset)%(nInput+offset)) == 0) {
+			inputNeurons[i] = -1;
+		} else {
+			inputNeurons[i] = 0;
+		}
+	}
 
 	//create input bias neuron
-	inputNeurons[nInput] = -1;
+	// inputNeurons[nInput] = -1;
 
-	hiddenNeurons = new( double[nHidden + 1] );
-	for ( int i=0; i < nHidden; i++ ) hiddenNeurons[i] = 0;
+	hiddenNeurons = new( double[batchSize*(nHidden + 1)] );
+	for ( int i=0; i < batchSize*(nHidden+1); i++ ) {
+		offset = i/(nHidden+1);
+		if (i && ((i+offset)%(nHidden+offset)) == 0) {
+			hiddenNeurons[i] = -1;
+		} else {
+			hiddenNeurons[i] = 0;
+		}
+	}
+	// for ( int i=0; i < nHidden; i++ ) hiddenNeurons[i] = 0;
 
 	//create hidden bias neuron
-	hiddenNeurons[nHidden] = -1;
+	// hiddenNeurons[nHidden] = -1;
 
-	outputNeurons = new( double[nOutput] );
-	for ( int i=0; i < nOutput; i++ ) outputNeurons[i] = 0;
+	// outputNeurons = new( double[nOutput] );
+	outputNeurons = new( double[batchSize*(nOutput + 1)] );
+	for ( int i=0; i < batchSize*(nOutput+1); i++ ) {
+		outputNeurons[i] = 0;
+	}
+
+	// for ( int i=0; i < nOutput; i++ ) outputNeurons[i] = 0;
 
 	//create weight lists (include bias neuron weights)
 	//--------------------------------------------------------------------------------------------------------
@@ -120,7 +171,7 @@ neuralNetwork::~neuralNetwork()
 	for (int j=0; j <= nHidden; j++) delete[] wHiddenOutput[j];
 	delete[] wHiddenOutput;
 
-	/*	
+	
 	cudaFree(device_output1);
 	cudaFree(input);
 	cudaFree(w1);
@@ -128,7 +179,7 @@ neuralNetwork::~neuralNetwork()
 	cudaFree(device_output2);
 	cudaFree(hidden);
 	cudaFree(w2);
-	*/
+	
 }
 
 /*******************************************************************
@@ -208,15 +259,15 @@ void neuralNetwork::initializeWeights()
 {
 	double startTime = CycleTimer::currentSeconds();
 
-	/*
-	cudaMalloc(&device_output1, sizeof(double) * nHidden);
-    cudaMalloc(&input, sizeof(double) * (nInput+1));
+	
+	cudaMalloc(&device_output1, sizeof(double) * batchSize*nHidden);
+    cudaMalloc(&input, sizeof(double) * batchSize*(nInput+1));
     cudaMalloc(&w1, sizeof(double) * (nInput+1)*nHidden);
 
-    cudaMalloc(&device_output2, sizeof(double) * nOutput);
-    cudaMalloc(&hidden, sizeof(double) * (nHidden+1));
+    cudaMalloc(&device_output2, sizeof(double) * batchSize*nOutput);
+    cudaMalloc(&hidden, sizeof(double) * batchSize*(nHidden+1));
     cudaMalloc(&w2, sizeof(double) * (nHidden+1)*nOutput);
-    */
+    
 
 	//set weights between input and hidden 		
 	//--------------------------------------------------------------------------------------------------------
@@ -252,6 +303,50 @@ inline double neuralNetwork::activationFunction( double x )
 	//sigmoid function
 	return 1/(1+exp(-x));
 }	
+
+void neuralNetwork::feedForwardBatch(vector<double*> patternVector) {
+	int offset = 0;
+	for (int b = 0; b<batchSize; b++) {
+		for(int i = 0; i < nInput; i++) {
+			if (i%nInput == 0) {
+				offset += 1;
+			}
+			inputNeurons[i+(b*nInput)+offset] = patternVector[b][i];
+		}
+	}
+
+	dim3 blockDim(1024, 1);
+    dim3 gridDim(1024);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+    cudaMemcpy(input, inputNeurons, sizeof(double) * batchSize*(nInput+1), cudaMemcpyHostToDevice);
+    cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
+    forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden, batchSize);
+    cudaThreadSynchronize();
+    cudaMemcpy(hiddenNeurons, device_output1, batchSize*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
+
+    //w2 part
+    dim3 gridDim2(nOutput*batchSize);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+	cudaMemcpy(hidden, hiddenNeurons, sizeof(double) * batchSize*(nHidden+1), cudaMemcpyHostToDevice);
+	cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(double), cudaMemcpyHostToDevice);
+	forward_prop_kernel<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput,batchSize);
+	cudaThreadSynchronize();
+	cudaMemcpy(outputNeurons, device_output2, batchSize*nOutput*sizeof(double), cudaMemcpyDeviceToHost);
+
+    //    dim3 gridDim2(nOutput);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+	
+ //    cudaMemcpy(hidden, hiddenNeurons, sizeof(double) * (nHidden+1), cudaMemcpyHostToDevice);
+ //    // double endTime1 = CycleTimer::currentSeconds();
+    
+ //    cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(double), cudaMemcpyHostToDevice);
+ //    // double endTime2 = CycleTimer::currentSeconds();
+
+	// forward_prop_kernel<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput);
+
+	// cudaThreadSynchronize();
+	// // double endTime3 = CycleTimer::currentSeconds();
+
+	// cudaMemcpy(outputNeurons, device_output2, nOutput*sizeof(double), cudaMemcpyDeviceToHost);
+
+}
 
 /*******************************************************************
 * Feed Forward Operation

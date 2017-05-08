@@ -187,12 +187,25 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 	//incorrect patterns
 	double incorrectPatterns = 0;
 	
+	vector<double*>largePattern;
+	vector<double*>largeTarget; 
+
 	//for every training pattern
 	for ( int tp = 0; tp < (int) trainingSet.size(); tp++)
-	{						
+	{
+		largePattern.push_back(trainingSet[tp]->pattern);
+		largeTarget.push_back(trainingSet[tp]->target);
 		//feed inputs through network and backpropagate errors
 		// double startForward = CycleTimer::currentSeconds();
-		NN->feedForward( trainingSet[tp]->pattern );
+		if (useBatch && ((tp == (int) trainingSet.size()-1) || (largePattern.size() == NN->batchSize))) {
+			NN->feedForwardBatch( largePattern );
+			backpropagateBatch( largeTarget );
+			updateWeights();
+			largePattern.clear();
+		} else {
+			NN->feedForward( trainingSet[tp]->pattern );
+			backpropagate( trainingSet[tp]->target );
+		}
 
 		// double endForward = CycleTimer::currentSeconds();
 	 //    double timeForward = endForward - startForward;
@@ -200,11 +213,6 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 	 //    printf("Forward: %f\n", timeForward);
 
 	    // double startBack = CycleTimer::currentSeconds();
-		backpropagate( trainingSet[tp]->target );	
-
-		if (useBatch && tp%20==0) {
-			updateWeights();
-		}
 
 		// double endBack = CycleTimer::currentSeconds();
 	 //    double timeBack = endBack - startBack;
@@ -232,6 +240,48 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
     printf("Iteration: %f\n", timeIter);
 
 }
+
+/*******************************************************************
+* Propagate errors back through NN and calculate delta values in batches
+********************************************************************/
+void neuralNetworkTrainer::backpropagateBatch(vector<double*> desiredOutputsVector) {
+	for (int b=0; b<NN->batchSize; b++) {
+		for (int k = 0; k < (NN->nOutput); k++)
+		{
+			// cout << "TNUM " << omp_get_thread_num() << endl;
+			//get error gradient for every output node
+			outputErrorGradients[k] = getOutputErrorGradient( desiredOutputsVector[b][k], NN->outputNeurons[b*k] );
+			
+			//for all nodes in hidden layer and bias neuron
+			// #pragma omp for
+			for (int j = 0; j <= NN->nHidden; j++) 
+			{
+				// if (omp_get_thread_num()) {
+				// 	cout << "TNUM " << omp_get_thread_num() << endl;
+				// }
+				//calculate change in weight
+				deltaHiddenOutput[j][k] += learningRate * NN->hiddenNeurons[b*j] * outputErrorGradients[k];
+			}
+		}
+
+		for (int j = 0; j < NN->nHidden; j++)
+		{
+			//get error gradient for every hidden node
+			hiddenErrorGradients[j] = getHiddenErrorGradient( j );
+
+			//for all nodes in input layer and bias neuron
+			// #pragma omp for
+			for (int i = 0; i <= NN->nInput; i++)
+			{
+				//calculate change in weight 
+				deltaInputHidden[i][j] += learningRate * NN->inputNeurons[b*i] * hiddenErrorGradients[j]; 
+
+			}
+		}
+	}
+
+}
+
 /*******************************************************************
 * Propagate errors back through NN and calculate delta values
 ********************************************************************/
