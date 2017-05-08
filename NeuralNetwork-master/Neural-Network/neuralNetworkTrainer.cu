@@ -47,11 +47,25 @@ neuralNetworkTrainer::neuralNetworkTrainer( neuralNetwork *nn )	:	NN(nn),
 
 	//create error gradient storage
 	//--------------------------------------------------------------------------------------------------------
-	hiddenErrorGradients = new( double[NN->nHidden + 1] );
-	for ( int i=0; i <= NN->nHidden; i++ ) hiddenErrorGradients[i] = 0;
+	hiddenErrorGradients = new( double[(NN->batchSize)*(NN->nHidden + 1)] );
+	for (int b = 0; b<NN->batchSize; b++) {
+	    for(int i = 0; i < NN->nHidden+1; i++) { 
+            hiddenErrorGradients[b*(NN->nHidden+1) + i] = 0;
+        }
+	}
 	
-	outputErrorGradients = new( double[NN->nOutput + 1] );
-	for ( int i=0; i <= NN->nOutput; i++ ) outputErrorGradients[i] = 0;
+	outputErrorGradients = new( double[(NN->batchSize)*(NN->nOutput + 1)] );
+	for (int b = 0; b<NN->batchSize; b++) {
+	    for(int i = 0; i < NN->nOutput+1; i++) { 
+            outputErrorGradients[b*(NN->nOutput+1) + i] = 0;
+        }
+	}
+
+	// hiddenErrorGradients = new( double[NN->nHidden + 1] );
+	// for ( int i=0; i <= NN->nHidden; i++ ) hiddenErrorGradients[i] = 0;
+	
+	// outputErrorGradients = new( double[NN->nOutput + 1] );
+	// for ( int i=0; i <= NN->nOutput; i++ ) outputErrorGradients[i] = 0;
 }
 
 
@@ -113,6 +127,17 @@ double neuralNetworkTrainer::getHiddenErrorGradient( int j )
 	double weightedSum = 0;
 	for( int k = 0; k < NN->nOutput; k++ ) {
 		weightedSum += NN->wHiddenOutput[j][k] * outputErrorGradients[k];
+	}
+
+	return NN->hiddenNeurons[j] * ( 1 - NN->hiddenNeurons[j] ) * weightedSum;
+}
+
+double neuralNetworkTrainer::getHiddenErrorGradientBatch( int j, int b )
+{
+	//get sum of hidden->output weights * output error gradients
+	double weightedSum = 0;
+	for( int k = 0; k < NN->nOutput; k++ ) {
+		weightedSum += NN->wHiddenOutput[j][k] * outputErrorGradients[b*k];
 	}
 
 	return NN->hiddenNeurons[j] * ( 1 - NN->hiddenNeurons[j] ) * weightedSum;
@@ -246,38 +271,45 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 ********************************************************************/
 void neuralNetworkTrainer::backpropagateBatch(vector<double*> desiredOutputsVector) {
 	for (int b=0; b<NN->batchSize; b++) {
-		for (int k = 0; k < (NN->nOutput); k++)
-		{
-			// cout << "TNUM " << omp_get_thread_num() << endl;
-			//get error gradient for every output node
-			outputErrorGradients[k] = getOutputErrorGradient( desiredOutputsVector[b][k], NN->outputNeurons[b*k] );
-			
-			//for all nodes in hidden layer and bias neuron
+		// #pragma omp parallel
+		// {
 			// #pragma omp for
-			for (int j = 0; j <= NN->nHidden; j++) 
+			for (int k = 0; k < (NN->nOutput); k++)
 			{
-				// if (omp_get_thread_num()) {
-				// 	cout << "TNUM " << omp_get_thread_num() << endl;
-				// }
-				//calculate change in weight
-				deltaHiddenOutput[j][k] += learningRate * NN->hiddenNeurons[b*j] * outputErrorGradients[k];
+				// cout << "TNUM " << omp_get_thread_num() << endl;
+				//get error gradient for every output node
+				//outputErrorGradients[k] = getOutputErrorGradient( desiredOutputsVector[b][k], NN->outputNeurons[b*k] );
+				outputErrorGradients[b*k] = getOutputErrorGradient( desiredOutputsVector[b][k], NN->outputNeurons[b*k] );
+
+				//for all nodes in hidden layer and bias neuron
+				// #pragma omp for
+				for (int j = 0; j <= NN->nHidden; j++) 
+				{
+					// if (omp_get_thread_num()) {
+					// 	cout << "TNUM " << omp_get_thread_num() << endl;
+					// }
+					//calculate change in weight
+					// #pragma omp atomic
+					deltaHiddenOutput[j][k] += learningRate * NN->hiddenNeurons[b*j] * outputErrorGradients[b*k];
+				}
 			}
-		}
-
-		for (int j = 0; j < NN->nHidden; j++)
-		{
-			//get error gradient for every hidden node
-			hiddenErrorGradients[j] = getHiddenErrorGradient( j );
-
-			//for all nodes in input layer and bias neuron
 			// #pragma omp for
-			for (int i = 0; i <= NN->nInput; i++)
+			for (int j = 0; j < NN->nHidden; j++)
 			{
-				//calculate change in weight 
-				deltaInputHidden[i][j] += learningRate * NN->inputNeurons[b*i] * hiddenErrorGradients[j]; 
+				//get error gradient for every hidden node
+				hiddenErrorGradients[b*j] = getHiddenErrorGradientBatch( j, b );
 
+				//for all nodes in input layer and bias neuron
+				// #pragma omp for
+				for (int i = 0; i <= NN->nInput; i++)
+				{
+					//calculate change in weight 
+					// #pragma omp atomic
+					deltaInputHidden[i][j] += learningRate * NN->inputNeurons[b*i] * hiddenErrorGradients[b*j]; 
+
+				}
 			}
-		}
+		// }
 	}
 
 }

@@ -89,6 +89,7 @@ public:
 private:
 	inline double getOutputErrorGradient( double desiredValue, double outputValue );
 	double getHiddenErrorGradient( int j );
+	double getHiddenErrorGradientBatch( int j, int b );
 	void runTrainingEpoch( std::vector<dataEntry*> trainingSet );
 	void backpropagateBatch(std::vector<double*> desiredOutputsVector);
 	void backpropagate(double* desiredOutputs);

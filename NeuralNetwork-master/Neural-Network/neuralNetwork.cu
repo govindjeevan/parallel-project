@@ -27,7 +27,7 @@
 using namespace std;
 
 
-/*
+
 __global__ void
 forward_prop_kernel(double *device_output, double *input, double *weights, int num_first, int num_second) {
 	int linearThreadIndex = threadIdx.x;
@@ -52,12 +52,12 @@ forward_prop_kernel(double *device_output, double *input, double *weights, int n
     	device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_first]));
     }
 }
-*/
+
 
 // first, second -> input=input+1, nhidden
 // first, second -> hidden=hidden+1, noutput
 __global__ void
-forward_prop_kernel(double *device_output, double *input, double *weights, int num_first, int num_second, int batchSize) {
+forward_prop_kernel_batch(double *device_output, double *input, double *weights, int num_first, int num_second, int batchSize) {
 	int linearThreadIndex = threadIdx.x;
 	// PRINT LINEAR THREAD INDEX TO DEBUG 
 	int unit = blockIdx.x%num_second;
@@ -321,7 +321,7 @@ void neuralNetwork::feedForwardBatch(vector<double*> patternVector) {
     dim3 gridDim(1024);//((1024*1024) + blockDim.x - 1) / blockDim.x);
     cudaMemcpy(input, inputNeurons, sizeof(double) * batchSize*(nInput+1), cudaMemcpyHostToDevice);
     cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(double), cudaMemcpyHostToDevice);
-    forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden, batchSize);
+    forward_prop_kernel_batch<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden, batchSize);
     cudaThreadSynchronize();
     cudaMemcpy(hiddenNeurons, device_output1, batchSize*nHidden*sizeof(double), cudaMemcpyDeviceToHost);
 
@@ -329,7 +329,7 @@ void neuralNetwork::feedForwardBatch(vector<double*> patternVector) {
     dim3 gridDim2(nOutput*batchSize);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	cudaMemcpy(hidden, hiddenNeurons, sizeof(double) * batchSize*(nHidden+1), cudaMemcpyHostToDevice);
 	cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(double), cudaMemcpyHostToDevice);
-	forward_prop_kernel<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput,batchSize);
+	forward_prop_kernel_batch<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput,batchSize);
 	cudaThreadSynchronize();
 	cudaMemcpy(outputNeurons, device_output2, batchSize*nOutput*sizeof(double), cudaMemcpyDeviceToHost);
 
@@ -361,7 +361,7 @@ void neuralNetwork::feedForward(double* pattern)
 	}
 
 	// double startTime = CycleTimer::currentSeconds();
-	/*
+	
 	dim3 blockDim(1024, 1);
     dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	
@@ -378,7 +378,7 @@ void neuralNetwork::feedForward(double* pattern)
 
 	cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(double), cudaMemcpyDeviceToHost);
 	// double endTime4 = CycleTimer::currentSeconds();
-	*/
+	
 	// double time1 = endTime1 - startTime;
 	// double time2 = endTime2 - endTime1;
 	// double time3 = endTime3 - endTime2;
@@ -398,22 +398,22 @@ void neuralNetwork::feedForward(double* pattern)
 		
 		double temp = 0.0;
 		
-		#pragma omp for //schedule(static, 16)
-		for(int j=0; j < nHidden; j++)
-		{
-			temp = 0.0;
-			//clear value
-			hiddenNeurons[j] = 0;	
-			//get weighted sum of pattern and bias neuron
-		 	// #pragma omp parallel for reduction(+ : temp)
-			for( int i=0; i <= nInput; i++ ) {
-				temp += inputNeurons[i] * wInputHidden[i][j];
-			}
-			// cout << "temp: " << hiddenNeurons[j] << endl;
-			//set to result of sigmoid
-			hiddenNeurons[j] = activationFunction( temp );			
-			// cout << "output: " << hiddenNeurons[j] << endl;
-		}
+		// #pragma omp for //schedule(static, 16)
+		// for(int j=0; j < nHidden; j++)
+		// {
+		// 	temp = 0.0;
+		// 	//clear value
+		// 	hiddenNeurons[j] = 0;	
+		// 	//get weighted sum of pattern and bias neuron
+		//  	// #pragma omp parallel for reduction(+ : temp)
+		// 	for( int i=0; i <= nInput; i++ ) {
+		// 		temp += inputNeurons[i] * wInputHidden[i][j];
+		// 	}
+		// 	// cout << "temp: " << hiddenNeurons[j] << endl;
+		// 	//set to result of sigmoid
+		// 	hiddenNeurons[j] = activationFunction( temp );			
+		// 	// cout << "output: " << hiddenNeurons[j] << endl;
+		// }
 		
 	
 		// double endTime1 = CycleTimer::currentSeconds();

@@ -32,12 +32,12 @@ int main()
 	// d.setCreationApproach( STATIC, 10 );	
 
 	//create neural network
-	neuralNetwork nn(784,200,10, 5);
+	neuralNetwork nn(784,700,10, 1);
 	nn.printCudaInfo();
 
 	//create neural network trainer
 	neuralNetworkTrainer nT( &nn );
-	nT.setTrainingParameters(0.5, true);
+	nT.setTrainingParameters(0.5, false);
 	nT.setStoppingConditions(100, 100);
 	nT.enableLogging("log.csv", 5);
 	
