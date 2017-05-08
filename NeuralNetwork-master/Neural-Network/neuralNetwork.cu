@@ -92,28 +92,31 @@ neuralNetwork::neuralNetwork(int nI, int nH, int nO, int bS) : nInput(nI), nHidd
 	//create neuron lists
 	//--------------------------------------------------------------------------------------------------------
 	inputNeurons = new( double[batchSize*(nInput + 1)] );
-	int offset = 0;
-	for ( int i=0; i < batchSize*(nInput+1); i++ ) {
-		offset = i/(nInput+1);
-		if (i && ((i+offset)%(nInput+offset)) == 0) {
-			inputNeurons[i] = -1;
-		} else {
-			inputNeurons[i] = 0;
-		}
-	}
+        for (int b= 0; b<batchSize; b++) {
+            for (int i=0; i<nInput+1; i++) {
+                if (i==nInput) {
+                    inputNeurons[(b+1)*(nInput)] = -1;
+                }
+                else {
+                    inputNeurons[b*(nInput+1) + i] = 0;
+                } 
+            }
+        }
 
 	//create input bias neuron
 	// inputNeurons[nInput] = -1;
 
 	hiddenNeurons = new( double[batchSize*(nHidden + 1)] );
-	for ( int i=0; i < batchSize*(nHidden+1); i++ ) {
-		offset = i/(nHidden+1);
-		if (i && ((i+offset)%(nHidden+offset)) == 0) {
-			hiddenNeurons[i] = -1;
-		} else {
-			hiddenNeurons[i] = 0;
-		}
-	}
+        for (int b=0; b<batchSize; b++) {
+            for (int i=0; i<nHidden+1; i++) {
+                if (i==nHidden) {
+                    hiddenNeurons[(b+1)*(nHidden)] = -1;
+                }
+                else {
+                    hiddenNeurons[b*(nHidden+1) + i] = 0; 
+                }
+            }
+        }
 	// for ( int i=0; i < nHidden; i++ ) hiddenNeurons[i] = 0;
 
 	//create hidden bias neuron
@@ -307,12 +310,11 @@ inline double neuralNetwork::activationFunction( double x )
 void neuralNetwork::feedForwardBatch(vector<double*> patternVector) {
 	int offset = 0;
 	for (int b = 0; b<batchSize; b++) {
-		for(int i = 0; i < nInput; i++) {
-			if (i%nInput == 0) {
-				offset += 1;
-			}
-			inputNeurons[i+(b*nInput)+offset] = patternVector[b][i];
-		}
+	    for(int i = 0; i < nInput+1; i++) { 
+                if (i!=nInput) {
+                    inputNeurons[b*(nInput+1) + i] = patternVector[b][i];
+                }
+            }
 	}
 
 	dim3 blockDim(1024, 1);
