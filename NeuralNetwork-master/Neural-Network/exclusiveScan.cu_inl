@@ -49,8 +49,8 @@
 
 //Almost the same as naive scan1Inclusive, but doesn't need __syncthreads()
 //assuming size <= WARP_SIZE
-inline __device__ double
-warpScanInclusive(int threadIndex, double idata, volatile double *s_Data, int size){
+inline __device__ float
+warpScanInclusive(int threadIndex, float idata, volatile float *s_Data, int size){
     // Note some of the calculations are obscure because they are optimized.
     // For example, (threadIndex & (size - 1)) computes threadIndex % size,
     // which works, assuming size is a power of 2.
@@ -66,19 +66,19 @@ warpScanInclusive(int threadIndex, double idata, volatile double *s_Data, int si
     return s_Data[pos];
 }
 
-inline __device__ double warpScanExclusive(int threadIndex, double idata, volatile double *sScratch, int size){
+inline __device__ float warpScanExclusive(int threadIndex, float idata, volatile float *sScratch, int size){
     return warpScanInclusive(threadIndex, idata, sScratch, size) - int(idata);
 }
 
 __inline__ __device__ void
-sharedMemExclusiveScan(int threadIndex, double* sInput, double* sOutput, volatile double* sScratch, int size)
+sharedMemExclusiveScan(int threadIndex, float* sInput, float* sOutput, volatile float* sScratch, int size)
 {
     if (size > WARP_SIZE) {
 
-        double idata = sInput[threadIndex];
+        float idata = sInput[threadIndex];
 
         //Bottom-level inclusive warp scan
-        double warpResult = warpScanInclusive(threadIndex, idata, sScratch, WARP_SIZE);
+        float warpResult = warpScanInclusive(threadIndex, idata, sScratch, WARP_SIZE);
 
         // Save top elements of each warp for exclusive warp scan sync
         // to wait for warp scans to complete (because s_Data is being
@@ -93,7 +93,7 @@ sharedMemExclusiveScan(int threadIndex, double* sInput, double* sOutput, volatil
 
         if ( threadIndex < (SCAN_BLOCK_DIM / WARP_SIZE)) {
             // grab top warp elements
-            double val = sScratch[threadIndex];
+            float val = sScratch[threadIndex];
             // calculate exclusive scan and write back to shared memory
             sScratch[threadIndex] = warpScanExclusive(threadIndex, val, sScratch, size >> LOG2_WARP_SIZE);
         }
@@ -104,7 +104,7 @@ sharedMemExclusiveScan(int threadIndex, double* sInput, double* sOutput, volatil
         sOutput[threadIndex] = warpResult + sScratch[threadIndex >> LOG2_WARP_SIZE] - idata;
 
     } else if (threadIndex < WARP_SIZE) {
-        double idata = sInput[threadIndex];
+        float idata = sInput[threadIndex];
         sOutput[threadIndex] = warpScanExclusive(threadIndex, idata, sScratch, size);
     }
 }

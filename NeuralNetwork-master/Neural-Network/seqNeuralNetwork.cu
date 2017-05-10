@@ -23,7 +23,7 @@ using namespace std;
 /*******************************************************************
 * Constructor
 ********************************************************************/
-neuralNetwork::neuralNetwork(int nI, int nH, int nO) : nInput(nI), nHidden(nH), nOutput(nO)
+neuralNetwork::neuralNetwork(int nI, int nH, int nO, int bS) : nInput(nI), nHidden(nH), nOutput(nO), batchSize(bS)
 {				
 	//create neuron lists
 	//--------------------------------------------------------------------------------------------------------

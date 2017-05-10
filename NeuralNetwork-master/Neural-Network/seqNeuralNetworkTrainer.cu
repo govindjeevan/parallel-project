@@ -202,6 +202,10 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 	    // double startBack = CycleTimer::currentSeconds();
 		backpropagate( trainingSet[tp]->target );	
 
+		if (tp%20 == 0 && useBatch) {
+			updateWeights();
+		}
+
 		// double endBack = CycleTimer::currentSeconds();
 	 //    double timeBack = endBack - startBack;
 
@@ -217,7 +221,7 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 	}//end for
 
 	//if using batch learning - update the weights
-	if ( useBatch ) updateWeights();
+	// if ( useBatch ) updateWeights();
 	
 	//update training accuracy
 	trainingSetAccuracy = 100 - (incorrectPatterns/trainingSet.size() * 100);
@@ -233,50 +237,43 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 ********************************************************************/
 void neuralNetworkTrainer::backpropagate( double* desiredOutputs )
 {		
-	#pragma omp parallel
+	//modify deltas between hidden and output layers
+	//--------------------------------------------------------------------------------------------------------
+	for (int k = 0; k < NN->nOutput; k++)
 	{
-		//modify deltas between hidden and output layers
-		//--------------------------------------------------------------------------------------------------------
-		#pragma omp for
-		for (int k = 0; k < NN->nOutput; k++)
+		// cout << "TNUM " << omp_get_thread_num() << endl;
+		//get error gradient for every output node
+		outputErrorGradients[k] = getOutputErrorGradient( desiredOutputs[k], NN->outputNeurons[k] );
+		
+		//for all nodes in hidden layer and bias neuron
+		// #pragma omp for
+		for (int j = 0; j <= NN->nHidden; j++) 
 		{
-			// cout << "TNUM " << omp_get_thread_num() << endl;
-			//get error gradient for every output node
-			outputErrorGradients[k] = getOutputErrorGradient( desiredOutputs[k], NN->outputNeurons[k] );
-			
-			//for all nodes in hidden layer and bias neuron
-			// #pragma omp for
-			for (int j = 0; j <= NN->nHidden; j++) 
-			{
-				// if (omp_get_thread_num()) {
-				// 	cout << "TNUM " << omp_get_thread_num() << endl;
-				// }
-				//calculate change in weight
-				if ( !useBatch ) deltaHiddenOutput[j][k] = learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k];
-				else deltaHiddenOutput[j][k] += learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k];
-			}
-		}
-		//modify deltas between input and hidden layers
-		//--------------------------------------------------------------------------------------------------------
-		#pragma omp for
-		for (int j = 0; j < NN->nHidden; j++)
-		{
-			//get error gradient for every hidden node
-			hiddenErrorGradients[j] = getHiddenErrorGradient( j );
-
-			//for all nodes in input layer and bias neuron
-			// #pragma omp for
-			for (int i = 0; i <= NN->nInput; i++)
-			{
-				//calculate change in weight 
-				if ( !useBatch ) deltaInputHidden[i][j] = learningRate * NN->inputNeurons[i] * hiddenErrorGradients[j];
-				else deltaInputHidden[i][j] += learningRate * NN->inputNeurons[i] * hiddenErrorGradients[j]; 
-
-			}
+			// if (omp_get_thread_num()) {
+			// 	cout << "TNUM " << omp_get_thread_num() << endl;
+			// }
+			//calculate change in weight
+			if ( !useBatch ) deltaHiddenOutput[j][k] = learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k];
+			else deltaHiddenOutput[j][k] += learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k];
 		}
 	}
-	
+	//modify deltas between input and hidden layers
+	//--------------------------------------------------------------------------------------------------------
+	for (int j = 0; j < NN->nHidden; j++)
+	{
+		//get error gradient for every hidden node
+		hiddenErrorGradients[j] = getHiddenErrorGradient( j );
 
+		//for all nodes in input layer and bias neuron
+		// #pragma omp for
+		for (int i = 0; i <= NN->nInput; i++)
+		{
+			//calculate change in weight 
+			if ( !useBatch ) deltaInputHidden[i][j] = learningRate * NN->inputNeurons[i] * hiddenErrorGradients[j];
+			else deltaInputHidden[i][j] += learningRate * NN->inputNeurons[i] * hiddenErrorGradients[j]; 
+
+		}
+	}
 	
 	
 	//if using stochastic learning update the weights immediately

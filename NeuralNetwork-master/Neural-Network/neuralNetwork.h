@@ -20,21 +20,21 @@ private:
 	int nInput, nHidden, nOutput, batchSize;
 	
 	//neurons
-	double* inputNeurons;
-	double* hiddenNeurons;
-	double* outputNeurons;
+	float* inputNeurons;
+	float* hiddenNeurons;
+	float* outputNeurons;
 
 	//weights
-	double** wInputHidden;
-	double** wHiddenOutput;
+	float** wInputHidden;
+	float** wHiddenOutput;
 
-	double *device_output1;
-	double *input;
-	double *w1;
+	float *device_output1;
+	float *input;
+	float *w1;
 
-	double *device_output2;
-	double *hidden;
-	double *w2;
+	float *device_output2;
+	float *hidden;
+	float *w2;
 		
 	//Friends
 	//--------------------------------------------------------------------------------------------
@@ -61,9 +61,9 @@ public:
 private: 
 
 	void initializeWeights();
-	inline double activationFunction( double x );
-	void feedForward( double* pattern );
-	void feedForwardBatch(std::vector<double*> patternVector);
+	inline float activationFunction( float x );
+	void feedForward( float* pattern );
+	void feedForwardBatch(std::vector<float*> patternVector);
 	
 };
 

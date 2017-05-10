@@ -5,7 +5,8 @@ CU_FILES   := neuralNetwork.cu neuralNetworkTrainer.cu
 
 CU_DEPS    :=
 
-CC_FILES   := main.cpp dataReader.cpp
+CC_FILES   := main.cpp dataReader.cpp 
+#neuralNetwork.cpp neuralNetworkTrainer.cpp
 
 # LOGS	   := logs
 
@@ -21,7 +22,8 @@ LIBS       :=
 FRAMEWORKS :=
 
 NVCCFLAGS=-O3 -m64 -Xcompiler -fopenmp --gpu-architecture compute_35
-LIBS += GL glut cudart
+LIBS += GL glut cudart cublas
+
 
 ifneq ($(wildcard /opt/cuda-8.0/.*),)
 # Latedays
@@ -30,6 +32,7 @@ else
 # GHC
 LDFLAGS=-L/usr/local/cuda/lib64/ -lcudart
 endif
+
 
 LDLIBS  := $(addprefix -l, $(LIBS))
 LDFRAMEWORKS := $(addprefix -framework , $(FRAMEWORKS))

@@ -32,7 +32,7 @@ int main()
 	// d.setCreationApproach( STATIC, 10 );	
 
 	//create neural network
-	neuralNetwork nn(784,700,10, 1);
+	neuralNetwork nn(784,200,10, 1);
 	nn.printCudaInfo();
 
 	//create neural network trainer

@@ -86,8 +86,8 @@ bool dataReader::loadDataFile( const char* filename, int nI, int nT )
 void dataReader::processLine( string &line )
 {
 	//create new pattern and target
-	double* pattern = new double[nInputs];
-	double* target = new double[nTargets];
+	float* pattern = new float[nInputs];
+	float* target = new float[nTargets];
 	
 	//store inputs		
 	char* cstr = new char[line.size()+1];

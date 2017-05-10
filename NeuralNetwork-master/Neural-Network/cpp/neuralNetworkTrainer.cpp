@@ -5,9 +5,11 @@
 #include <algorithm>
 #include <omp.h>
 
+/*
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <driver_functions.h>
+*/
 
 //include definition file
 #include "neuralNetworkTrainer.h"
@@ -31,40 +33,40 @@ neuralNetworkTrainer::neuralNetworkTrainer( neuralNetwork *nn )	:	NN(nn),
 {
 	//create delta lists
 	//--------------------------------------------------------------------------------------------------------
-	deltaInputHidden = new( float*[NN->nInput + 1] );
+	deltaInputHidden = new( double*[NN->nInput + 1] );
 	for ( int i=0; i <= NN->nInput; i++ ) 
 	{
-		deltaInputHidden[i] = new (float[NN->nHidden]);
+		deltaInputHidden[i] = new (double[NN->nHidden]);
 		for ( int j=0; j < NN->nHidden; j++ ) deltaInputHidden[i][j] = 0;		
 	}
 
-	deltaHiddenOutput = new( float*[NN->nHidden + 1] );
+	deltaHiddenOutput = new( double*[NN->nHidden + 1] );
 	for ( int i=0; i <= NN->nHidden; i++ ) 
 	{
-		deltaHiddenOutput[i] = new (float[NN->nOutput]);			
+		deltaHiddenOutput[i] = new (double[NN->nOutput]);			
 		for ( int j=0; j < NN->nOutput; j++ ) deltaHiddenOutput[i][j] = 0;		
 	}
 
 	//create error gradient storage
 	//--------------------------------------------------------------------------------------------------------
-	hiddenErrorGradients = new( float[(NN->batchSize)*(NN->nHidden + 1)] );
+	hiddenErrorGradients = new( double[(NN->batchSize)*(NN->nHidden + 1)] );
 	for (int b = 0; b<NN->batchSize; b++) {
 	    for(int i = 0; i < NN->nHidden+1; i++) { 
             hiddenErrorGradients[b*(NN->nHidden+1) + i] = 0;
         }
 	}
 	
-	outputErrorGradients = new( float[(NN->batchSize)*(NN->nOutput + 1)] );
+	outputErrorGradients = new( double[(NN->batchSize)*(NN->nOutput + 1)] );
 	for (int b = 0; b<NN->batchSize; b++) {
 	    for(int i = 0; i < NN->nOutput+1; i++) { 
             outputErrorGradients[b*(NN->nOutput+1) + i] = 0;
         }
 	}
 
-	// hiddenErrorGradients = new( float[NN->nHidden + 1] );
+	// hiddenErrorGradients = new( double[NN->nHidden + 1] );
 	// for ( int i=0; i <= NN->nHidden; i++ ) hiddenErrorGradients[i] = 0;
 	
-	// outputErrorGradients = new( float[NN->nOutput + 1] );
+	// outputErrorGradients = new( double[NN->nOutput + 1] );
 	// for ( int i=0; i <= NN->nOutput; i++ ) outputErrorGradients[i] = 0;
 }
 
@@ -112,7 +114,7 @@ void neuralNetworkTrainer::enableLogging(const char* filename, int resolution = 
 /*******************************************************************
 * calculate output error gradient
 ********************************************************************/
-inline float neuralNetworkTrainer::getOutputErrorGradient( float desiredValue, float outputValue)
+inline double neuralNetworkTrainer::getOutputErrorGradient( double desiredValue, double outputValue)
 {
 	//return error gradient
 	return outputValue * ( 1 - outputValue ) * ( desiredValue - outputValue );
@@ -121,10 +123,10 @@ inline float neuralNetworkTrainer::getOutputErrorGradient( float desiredValue, f
 /*******************************************************************
 * calculate input error gradient
 ********************************************************************/
-float neuralNetworkTrainer::getHiddenErrorGradient( int j )
+double neuralNetworkTrainer::getHiddenErrorGradient( int j )
 {
 	//get sum of hidden->output weights * output error gradients
-	float weightedSum = 0;
+	double weightedSum = 0;
 	for( int k = 0; k < NN->nOutput; k++ ) {
 		weightedSum += NN->wHiddenOutput[j][k] * outputErrorGradients[k];
 	}
@@ -132,10 +134,10 @@ float neuralNetworkTrainer::getHiddenErrorGradient( int j )
 	return NN->hiddenNeurons[j] * ( 1 - NN->hiddenNeurons[j] ) * weightedSum;
 }
 
-float neuralNetworkTrainer::getHiddenErrorGradientBatch( int j, int b )
+double neuralNetworkTrainer::getHiddenErrorGradientBatch( int j, int b )
 {
 	//get sum of hidden->output weights * output error gradients
-	float weightedSum = 0;
+	double weightedSum = 0;
 	for( int k = 0; k < NN->nOutput; k++ ) {
 		weightedSum += NN->wHiddenOutput[j][k] * outputErrorGradients[b*k];
 	}
@@ -149,7 +151,7 @@ void neuralNetworkTrainer::trainNetwork( trainingDataSet* tSet )
 {
 	cout	<< endl << " Neural Network Training Starting: " << endl
 			<< "==========================================================================" << endl
-			<< " LR: " << learningRate << ", Max Epochs: " << maxEpochs << ", Batch: " << useBatch << endl
+			<< " LR: " << learningRate << ", Max Epochs: " << maxEpochs << ", Batch: " << useBatch*NN->batchSize << endl
 			<< " " << NN->nInput << " Input Neurons, " << NN->nHidden << " Hidden Neurons, " << NN->nOutput << " Output Neurons" << endl
 			<< "==========================================================================" << endl << endl;
 
@@ -212,8 +214,8 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 	//incorrect patterns
 	double incorrectPatterns = 0;
 	
-	vector<float*>largePattern;
-	vector<float*>largeTarget; 
+	vector<double*>largePattern;
+	vector<double*>largeTarget; 
 
 	//for every training pattern
 	for ( int tp = 0; tp < (int) trainingSet.size(); tp++)
@@ -269,7 +271,7 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 /*******************************************************************
 * Propagate errors back through NN and calculate delta values in batches
 ********************************************************************/
-void neuralNetworkTrainer::backpropagateBatch(vector<float*> desiredOutputsVector) {
+void neuralNetworkTrainer::backpropagateBatch(vector<double*> desiredOutputsVector) {
 	for (int b=0; b<NN->batchSize; b++) {
 		// #pragma omp parallel
 		// {
@@ -317,8 +319,9 @@ void neuralNetworkTrainer::backpropagateBatch(vector<float*> desiredOutputsVecto
 /*******************************************************************
 * Propagate errors back through NN and calculate delta values
 ********************************************************************/
-void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
-{		
+void neuralNetworkTrainer::backpropagate( double* desiredOutputs )
+{
+	double startBack = CycleTimer::currentSeconds();
 	#pragma omp parallel
 	{
 		//modify deltas between hidden and output layers
@@ -367,6 +370,12 @@ void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
 	
 	//if using stochastic learning update the weights immediately
 	if ( !useBatch ) updateWeights();
+
+	double endBack = CycleTimer::currentSeconds();
+
+	double timeBack = endBack - startBack;
+
+	// cout << "Back = " << timeBack << endl;
 }
 /*******************************************************************
 * Update weights using delta values

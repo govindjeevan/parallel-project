@@ -17,12 +17,12 @@ class dataEntry
 {
 public:	
 	
-	double* pattern;	//input patterns
-	double* target;		//target result
+	float* pattern;	//input patterns
+	float* target;		//target result
 
 public:	
 
-	dataEntry(double* p, double* t): pattern(p), target(t) {}
+	dataEntry(float* p, float* t): pattern(p), target(t) {}
 		
 	~dataEntry()
 	{				
