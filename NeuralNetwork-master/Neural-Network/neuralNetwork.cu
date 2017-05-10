@@ -59,7 +59,8 @@ forward_prop_kernel(float *device_output, float *input, float *weights, int num_
     __syncthreads();
 
     if (linearThreadIndex == 0 && unit < num_second) {
-    	device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_first]));
+    	// device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_first]));
+    	device_output[unit] = prefixSumOutput[num_first];
     }
 }
 
@@ -383,7 +384,7 @@ void neuralNetwork::feedForward(float* pattern)
 	
 	
 	// dim3 blockDim(1024, 1);
- //    dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+ // 	dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	
     cudaMemcpy(input, inputNeurons, sizeof(float) * (nInput+1), cudaMemcpyHostToDevice);
     // double endTime1 = CycleTimer::currentSeconds();
@@ -391,15 +392,15 @@ void neuralNetwork::feedForward(float* pattern)
     cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(float), cudaMemcpyHostToDevice);
     // double endTime2 = CycleTimer::currentSeconds();
 
-	forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
+	//forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
 
-	cudaThreadSynchronize();
+	//cudaThreadSynchronize();
 	// // double endTime3 = CycleTimer::currentSeconds();
 
-	cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
 	// // double endTime4 = CycleTimer::currentSeconds();
 
-/*
+
 	cublasHandle_t handle;
 	cublasCreate(&handle);
 
@@ -410,7 +411,7 @@ void neuralNetwork::feedForward(float* pattern)
 
 	cublasDestroy(handle);
 	
-	*/
+	
 	
 	// double time1 = endTime1 - startTime;
 	// double time2 = endTime2 - endTime1;
@@ -428,7 +429,10 @@ void neuralNetwork::feedForward(float* pattern)
 	
 	#pragma omp parallel 
 	{
-		
+		#pragma omp for
+		for (int j = 0; j<nHidden; j++) {
+			hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );
+		}
 		// float temp = 0.0;
 		/*
 		// #pragma omp for //schedule(static, 16)
