@@ -25,6 +25,8 @@
 //include definition file
 #include "neuralNetwork.h"
 
+//#include "/afs/cs/academic/class/15418-s17/public/sw/OpenBLAS/cblas.h"
+//#include <openblas/cblas.h>
 using namespace std;
 
 void gpu_blas_mmul(cublasHandle_t &handle, const float *A, const float *B, float *C, const int m, const int k, const int n) {
@@ -321,7 +323,6 @@ inline float neuralNetwork::activationFunction( float x )
 void neuralNetwork::feedForwardBatch(vector<float*> patternVector) {
 	double startTime = CycleTimer::currentSeconds();
 
-	int offset = 0;
 	for (int b = 0; b<batchSize; b++) {
 	    for(int i = 0; i < nInput+1; i++) { 
                 if (i!=nInput) {
@@ -383,25 +384,25 @@ void neuralNetwork::feedForward(float* pattern)
 	// double startTime = CycleTimer::currentSeconds();
 	
 	
-	// dim3 blockDim(1024, 1);
- // 	dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+	dim3 blockDim(1024, 1);
+        dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	
     cudaMemcpy(input, inputNeurons, sizeof(float) * (nInput+1), cudaMemcpyHostToDevice);
-    // double endTime1 = CycleTimer::currentSeconds();
+    //double endTime1 = CycleTimer::currentSeconds();
     
     cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(float), cudaMemcpyHostToDevice);
     // double endTime2 = CycleTimer::currentSeconds();
 
-	//forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
+	forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
 
-	//cudaThreadSynchronize();
+	cudaThreadSynchronize();
 	// // double endTime3 = CycleTimer::currentSeconds();
 
-	//cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
 	// // double endTime4 = CycleTimer::currentSeconds();
 
 
-	cublasHandle_t handle;
+	/*cublasHandle_t handle;
 	cublasCreate(&handle);
 
 	gpu_blas_mmul(handle, input, w1, device_output1, 1, nInput+1, nHidden);
@@ -409,9 +410,18 @@ void neuralNetwork::feedForward(float* pattern)
 	cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
 
 
-	cublasDestroy(handle);
+	cublasDestroy(handle);*/
 	
-	
+        /*float alpha = 1.0;
+        float beta = 0.0;
+        float* tempWeights = new float[(nInput+1)*nHidden];
+        for (int i=0; i<nInput +1; i++) {
+            for (int j=0; j<nHidden; j++) {
+                tempWeights[i*nHidden + j] = wInputHidden[i][j];
+            }
+        }
+        
+	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 1, nHidden, nInput+1, alpha, inputNeurons, nInput+1, tempWeights, nHidden, beta, hiddenNeurons, nHidden);*/
 	
 	// double time1 = endTime1 - startTime;
 	// double time2 = endTime2 - endTime1;
