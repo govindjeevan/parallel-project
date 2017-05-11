@@ -18,11 +18,11 @@ CXX=g++ -m64
 CXXFLAGS=-fopenmp -O3 -Wall -g
 HOSTNAME=$(shell hostname)
 
-LIBS       :=
+LIBS       := 
 FRAMEWORKS :=
 
 NVCCFLAGS=-O3 -m64 -Xcompiler -fopenmp --gpu-architecture compute_35
-LIBS += GL glut cudart cublas
+LIBS += GL glut cudart cublas cblas
 
 
 ifneq ($(wildcard /opt/cuda-8.0/.*),)
