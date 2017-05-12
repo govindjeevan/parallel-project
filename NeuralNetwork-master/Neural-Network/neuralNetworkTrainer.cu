@@ -353,15 +353,7 @@ void neuralNetworkTrainer::backpropagateBatch(vector<float*> desiredOutputsVecto
 * Propagate errors back through NN and calculate delta values
 ********************************************************************/
 void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
-{		
-        dim3 blockDim(1024, 1);
-        dim3 gridDim(NN->nHidden);
-        cudaMemcpy(input, NN->inputNeurons, sizeof(float) * ((NN->nInput)+1), cudaMemcpyHostToDevice);
-        cudaMemcpy(hidden, NN->hiddenNeurons, NN->nHidden*sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(w2, NN->wHiddenOutput[0], ((NN->nHidden)+1)*(NN->nOutput)*sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(output_error_gradients, outputErrorGradients, sizeof(float) * ((NN->nOutput)+1), cudaMemcpyHostToDevice);
-        back_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, hidden, w2, output_error_gradients, (NN->nInput)+1, NN->nHidden, NN->nOutput, learningRate);
-        cudaMemcpy(deltaInputHidden[0], device_output1, (NN->batchSize)*(NN->nHidden)*sizeof(float), cudaMemcpyDeviceToHost);
+{	
         
 	#pragma omp parallel
 	{
@@ -405,8 +397,15 @@ void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
 			}
 		}*/
 	}
-	
 
+	dim3 blockDim(1024, 1);
+    dim3 gridDim(NN->nHidden);
+    cudaMemcpy(input, NN->inputNeurons, sizeof(float) * ((NN->nInput)+1), cudaMemcpyHostToDevice);
+    cudaMemcpy(hidden, NN->hiddenNeurons, NN->nHidden*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(w2, NN->wHiddenOutput[0], ((NN->nHidden)+1)*(NN->nOutput)*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(output_error_gradients, outputErrorGradients, sizeof(float) * ((NN->nOutput)+1), cudaMemcpyHostToDevice);
+    back_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, hidden, w2, output_error_gradients, (NN->nInput)+1, NN->nHidden, NN->nOutput, learningRate);
+    cudaMemcpy(deltaInputHidden[0], device_output1, (NN->batchSize)*(NN->nHidden)*sizeof(float), cudaMemcpyDeviceToHost);
 	
 	
 	//if using stochastic learning update the weights immediately
