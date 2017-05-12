@@ -23,7 +23,7 @@ back_prop_kernel(float *device_output, float *input, float *hidden, float* w2, f
 	int unit = blockIdx.x;
     // should we compute this outside of here, or make this parallel somehow as well? dedciate #output threads to dothis?
     __shared__ float weightedSum[1];
-    if (linearThreadIndex==0) {
+    if (linearThreadIndex == 0) {
         for (int i=0; i<nOutput; i++) {
           weightedSum[0] += w2[unit*nOutput + i] * outputErrorGradients[i];
         }
@@ -36,6 +36,29 @@ back_prop_kernel(float *device_output, float *input, float *hidden, float* w2, f
     }
 }
 
+
+__global__ void 
+back_prop_kernel_batch(float *device_output, float *input, float *hidden, float* w2, float* outputErrorGradients, int nInput, int nHidden, int nOutput, float learningRate, int batchSize) {
+    int linearThreadIndex = threadIdx.x;
+    int unit = blockIdx.x%nHidden;
+    int batch = blockIdx.x/nHidden; 
+    
+    __shared__ float weightedSum[1];
+    float temp = 0.0;
+    if (linearThreadIndex ==0 && unit<nHidden) {
+        for (int i=0; i<nOutput; i++) { 
+            weightedSum[0] += w2[unit*nOutput + i] * outputErrorGradients[batch*i];
+        }
+    }
+    
+    __syncthreads();
+   
+    if (linearThreadIndex < nInput) {
+        temp = learningRate * input[batch*linearThreadIndex] * hidden[batch*unit]*(1 - hidden[batch*unit]) * weightedSum[0];
+        atomicAdd(&device_output[linearThreadIndex*nHidden + unit], temp);
+    } 
+
+}
 /*******************************************************************
 * constructor
 ********************************************************************/
@@ -61,6 +84,8 @@ neuralNetworkTrainer::neuralNetworkTrainer( neuralNetwork *nn )	:	NN(nn),
 	{
 		for ( int j=0; j < NN->nHidden; j++ ) deltaInputHidden[i][j] = 0;		
 	}
+
+        //printf("%f\n", deltaInputHidden[5][5]);
 
 	/*for ( int i=0; i <= NN->nInput; i++ ) 
 	{
@@ -91,11 +116,11 @@ neuralNetworkTrainer::neuralNetworkTrainer( neuralNetwork *nn )	:	NN(nn),
         }
 	}
 
-        cudaMalloc(&device_output1, sizeof(float) * (NN->batchSize)*((NN->nInput)+1)*(NN->nHidden));
-        cudaMalloc(&input, sizeof(float) * (NN->batchSize)*(NN->nInput)+1);
+        cudaMalloc(&device_output1, sizeof(float) * ((NN->nInput)+1)*(NN->nHidden));
+        cudaMalloc(&input, sizeof(float) * (NN->batchSize)*((NN->nInput)+1));
         cudaMalloc(&hidden, sizeof(float) * (NN->batchSize)*((NN->nHidden) +1));
         cudaMalloc(&w2, sizeof(float) * ((NN->nHidden)+1)*(NN->nOutput));
-        cudaMalloc(&output_error_gradients, sizeof(float)*((NN->nOutput) +1));
+        cudaMalloc(&output_error_gradients, sizeof(float)*(NN->batchSize)*((NN->nOutput) +1));
 	// hiddenErrorGradients = new( float[NN->nHidden + 1] );
 	// for ( int i=0; i <= NN->nHidden; i++ ) hiddenErrorGradients[i] = 0;
 	
@@ -377,10 +402,11 @@ void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
 				if ( !useBatch ) deltaHiddenOutput[j][k] = learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k];
 				else deltaHiddenOutput[j][k] += learningRate * NN->hiddenNeurons[j] * outputErrorGradients[k];
 			}
+                                
 		}
 		//modify deltas between input and hidden layers
 		//--------------------------------------------------------------------------------------------------------
-		/*#pragma omp for
+		/*(#pragma omp for
 		for (int j = 0; j < NN->nHidden; j++)
 		{
 			//get error gradient for every hidden node
@@ -400,13 +426,12 @@ void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
 
 	dim3 blockDim(1024, 1);
     dim3 gridDim(NN->nHidden);
-    cudaMemcpy(input, NN->inputNeurons, sizeof(float) * ((NN->nInput)+1), cudaMemcpyHostToDevice);
-    cudaMemcpy(hidden, NN->hiddenNeurons, ((NN->nHidden)+1)*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(input, NN->inputNeurons, sizeof(float) * ((NN->nInput)+1) *(NN->batchSize), cudaMemcpyHostToDevice);
+    cudaMemcpy(hidden, NN->hiddenNeurons, (NN->batchSize)*((NN->nHidden)+1)*sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(w2, NN->wHiddenOutput[0], ((NN->nHidden)+1)*(NN->nOutput)*sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(output_error_gradients, outputErrorGradients, sizeof(float) * ((NN->nOutput)+1), cudaMemcpyHostToDevice);
+    cudaMemcpy(output_error_gradients, outputErrorGradients, sizeof(float) * (NN->batchSize)*((NN->nOutput)+1), cudaMemcpyHostToDevice);
     back_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, hidden, w2, output_error_gradients, (NN->nInput)+1, NN->nHidden, NN->nOutput, learningRate);
-    cudaMemcpy(deltaInputHidden[0], device_output1, (NN->batchSize)*(NN->nInput +1)*(NN->nHidden)*sizeof(float), cudaMemcpyDeviceToHost);
-	
+    cudaMemcpy(deltaInputHidden[0], device_output1, ((NN->nInput) +1)*(NN->nHidden)*sizeof(float), cudaMemcpyDeviceToHost);
 	
 	//if using stochastic learning update the weights immediately
 	if ( !useBatch ) updateWeights();
