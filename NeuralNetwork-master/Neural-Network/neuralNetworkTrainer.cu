@@ -32,7 +32,7 @@ back_prop_kernel(float *device_output, float *input, float *hidden, float* w2, f
     __syncthreads();
 
     if (linearThreadIndex < nInput) {
-        device_output[linearThreadIndex*nHidden + unit] = learningRate, input[linearThreadIndex] * hidden[unit]*(1 - hidden[unit]) * weightedSum[0];
+        device_output[linearThreadIndex*nHidden + unit] = learningRate * input[linearThreadIndex] * hidden[unit]*(1 - hidden[unit]) * weightedSum[0];
     }
 }
 
@@ -93,7 +93,7 @@ neuralNetworkTrainer::neuralNetworkTrainer( neuralNetwork *nn )	:	NN(nn),
 
         cudaMalloc(&device_output1, sizeof(float) * (NN->batchSize)*((NN->nInput)+1)*(NN->nHidden));
         cudaMalloc(&input, sizeof(float) * (NN->batchSize)*(NN->nInput)+1);
-        cudaMalloc(&hidden, sizeof(float) * (NN->batchSize)*(NN->nHidden));
+        cudaMalloc(&hidden, sizeof(float) * (NN->batchSize)*((NN->nHidden) +1));
         cudaMalloc(&w2, sizeof(float) * ((NN->nHidden)+1)*(NN->nOutput));
         cudaMalloc(&output_error_gradients, sizeof(float)*((NN->nOutput) +1));
 	// hiddenErrorGradients = new( float[NN->nHidden + 1] );
@@ -401,11 +401,11 @@ void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
 	dim3 blockDim(1024, 1);
     dim3 gridDim(NN->nHidden);
     cudaMemcpy(input, NN->inputNeurons, sizeof(float) * ((NN->nInput)+1), cudaMemcpyHostToDevice);
-    cudaMemcpy(hidden, NN->hiddenNeurons, NN->nHidden*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(hidden, NN->hiddenNeurons, ((NN->nHidden)+1)*sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(w2, NN->wHiddenOutput[0], ((NN->nHidden)+1)*(NN->nOutput)*sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(output_error_gradients, outputErrorGradients, sizeof(float) * ((NN->nOutput)+1), cudaMemcpyHostToDevice);
     back_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, hidden, w2, output_error_gradients, (NN->nInput)+1, NN->nHidden, NN->nOutput, learningRate);
-    cudaMemcpy(deltaInputHidden[0], device_output1, (NN->batchSize)*(NN->nHidden)*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(deltaInputHidden[0], device_output1, (NN->batchSize)*(NN->nInput +1)*(NN->nHidden)*sizeof(float), cudaMemcpyDeviceToHost);
 	
 	
 	//if using stochastic learning update the weights immediately
