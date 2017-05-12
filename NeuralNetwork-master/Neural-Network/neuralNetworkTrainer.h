@@ -54,11 +54,11 @@ private:
 	float* hiddenErrorGradients;
 	float* outputErrorGradients;
 
-        float *device_output1;
+    float *device_output1;
 	float *input;
-        float *hidden;
+    float *hidden;
 	float *w2;
-        float *output_error_gradients; 
+    float *output_error_gradients; 
 
 	//accuracy stats per epoch
 	double trainingSetAccuracy;

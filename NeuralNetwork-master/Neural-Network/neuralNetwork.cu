@@ -321,7 +321,6 @@ inline float neuralNetwork::activationFunction( float x )
 }	
 
 void neuralNetwork::feedForwardBatch(vector<float*> patternVector) {
-	double startTime = CycleTimer::currentSeconds();
 
 	for (int b = 0; b<batchSize; b++) {
 	    for(int i = 0; i < nInput+1; i++) { 
@@ -347,25 +346,6 @@ void neuralNetwork::feedForwardBatch(vector<float*> patternVector) {
 	cudaThreadSynchronize();
 	cudaMemcpy(outputNeurons, device_output2, batchSize*nOutput*sizeof(float), cudaMemcpyDeviceToHost);
 
-    //    dim3 gridDim2(nOutput);//((1024*1024) + blockDim.x - 1) / blockDim.x);
-	
- //    cudaMemcpy(hidden, hiddenNeurons, sizeof(float) * (nHidden+1), cudaMemcpyHostToDevice);
- //    // float endTime1 = CycleTimer::currentSeconds();
-    
- //    cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(float), cudaMemcpyHostToDevice);
- //    // double endTime2 = CycleTimer::currentSeconds();
-
-	// forward_prop_kernel<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput);
-
-	// cudaThreadSynchronize();
-	// // double endTime3 = CycleTimer::currentSeconds();
-
-	// cudaMemcpy(outputNeurons, device_output2, nOutput*sizeof(float), cudaMemcpyDeviceToHost);
-
-	double endTime = CycleTimer::currentSeconds();
-	double time = endTime - startTime;
-
-	cout << "Forward = " << time << endl;
 
 }
 
@@ -379,13 +359,11 @@ void neuralNetwork::feedForward(float* pattern)
 		inputNeurons[i] = pattern[i];
 	}
 
-
-	double startTime = CycleTimer::currentSeconds();
 	// double startTime = CycleTimer::currentSeconds();
 	
 	
 	dim3 blockDim(1024, 1);
-        dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
+    dim3 gridDim(nHidden);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	
     cudaMemcpy(input, inputNeurons, sizeof(float) * (nInput+1), cudaMemcpyHostToDevice);
     //double endTime1 = CycleTimer::currentSeconds();
@@ -398,11 +376,12 @@ void neuralNetwork::feedForward(float* pattern)
 	cudaThreadSynchronize();
 	// // double endTime3 = CycleTimer::currentSeconds();
 
-        cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
 	// // double endTime4 = CycleTimer::currentSeconds();
+	
 
-
-	/*cublasHandle_t handle;
+/*
+	cublasHandle_t handle;
 	cublasCreate(&handle);
 
 	gpu_blas_mmul(handle, input, w1, device_output1, 1, nInput+1, nHidden);
@@ -443,7 +422,8 @@ void neuralNetwork::feedForward(float* pattern)
 		for (int j = 0; j<nHidden; j++) {
 			hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );
 		}
-		// float temp = 0.0;
+
+		float temp = 0.0;
 		/*
 		// #pragma omp for //schedule(static, 16)
 		for(int j=0; j < nHidden; j++)
@@ -470,7 +450,7 @@ void neuralNetwork::feedForward(float* pattern)
 		#pragma omp for //schedule(static, 16)//reduction(+ : temp)
 		for(int k=0; k < nOutput; k++)
 		{
-			float temp = 0.0;
+			temp = 0.0;
 			//clear value
 			outputNeurons[k] = 0;			
 					
@@ -504,9 +484,9 @@ void neuralNetwork::feedForward(float* pattern)
 	// double endTime4 = CycleTimer::currentSeconds();
 */
 
-	double endTime3 = CycleTimer::currentSeconds();
+	// double endTime3 = CycleTimer::currentSeconds();
 
-	double time = endTime3 - startTime;
+	// double time = endTime3 - startTime;
 
 	// cout << "Forward = " << time << endl;
 	

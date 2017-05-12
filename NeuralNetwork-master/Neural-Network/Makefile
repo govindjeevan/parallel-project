@@ -22,7 +22,7 @@ LIBS       :=
 FRAMEWORKS :=
 
 NVCCFLAGS=-O3 -m64 -Xcompiler -fopenmp --gpu-architecture compute_35
-LIBS += GL glut cudart cublas cblas
+LIBS += GL glut cudart cublas
 
 
 ifneq ($(wildcard /opt/cuda-8.0/.*),)
