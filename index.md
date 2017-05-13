@@ -64,6 +64,8 @@ Podlozhnyuk, Victor. “Image Convolution with CUDA.” http://developer.downloa
 
 Pethick, Mark, Michael Liddle, Paul Werstein, and Zhiyi Huang. “Parallelization of a Backpropagation Neural Network on a Cluster Computer.” 2003. http://www.cs.otago.ac.nz/staffpriv/hzy/papers/pdcs03.pdf
 
+Anguelov, Bobby. "Basic Neural Network Tutorial : C++ Implementation and Source Code." Taking Initiative. 2008. https://takinginitiative.wordpress.com/2008/04/23/basic-neural-network-tutorial-c-implementation-and-source-code/
+
 **Work performed by each student** 
 Equal work was performed by both project members.
 
