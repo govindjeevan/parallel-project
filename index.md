@@ -14,10 +14,10 @@ There is a need for neural networks to be computationally efficient so that we a
 **Approaches** 
 Our approach focused on three different implementations exploiting data parallelism in our neural net, namely multi-core, multiprocessors on the GPU, and batch processing. We used the GHC cluster machines as the platform to execute our implementations on. We did this to utilize their 8 core, 2-way hyperthreading, i7 Xeon processors as well as the NVIDIA GeForce GTX 1080 GPU. This allowed us to implement parallelization on the GPU through CUDA, and use OpenMP to parallelize across the 16 execution contexts.
 
-OpenMP
+#### OpenMP
 Our first approach was to use multi-core parallelism with OpenMP.  In the feed-forward algorithm, we parallelized the matrix multiplications between the layers. We essentially computed the resultant product matrix by computing the dot product of the input vector with each column in the weights matrix. We launched 16 threads evenly distributed across the number of hidden units and used OpenMP for reduction to sum over these element-wise products. In backpropagation, we computed the error gradients and stored the deltas in parallel for each layer. We then updated the weight matrices in parallel as well. 
 
-CUDA 
+#### CUDA 
 Our second approach was to leverage the power of the GPU with CUDA. We first did this with matrix multiplications in feed-forward. Our initial attempt to parallelize matrix multiplication was to create a very large array of dimensions corresponding to the sizes of the layers being considered in the current activation stage. To exemplify, we can consider the step of feeding the input vector through the hidden layer, resulting in a vector-matrix multiplication of sizes (1 x (nInput+1)) and ((nInput+1) x nHidden), where nInput = 784, and nHidden (the number of hidden units) was varied over implementations. Thus, this outputs the resultant product vector of size (1 x (nHidden)). 
 
 We then launched a CUDA kernel where each thread fills in a single element in this array, by performing the appropriate multiplication of its assigned elements from the input vector and the first weights matrix. The Thrust library’s segmented scan was then applied on the result and the relevant elements were extracted and stored as the hidden neuron values. After timing this implementation, we saw we did not do much better than the sequential implementation and so we decided to switch to a shared-memory based scan, which we expected would be faster.
@@ -26,7 +26,7 @@ This implementation used similar techniques as the previous but now we launched 
 
 After this, we found better speedup compared to our sequential implementation but still could not compare to the multi-core CPU implementation. We realized that the overhead of launching kernels and copying data between the host and device was still outweighing the benefits of using the GPU with our workload. The matrix multiplication was still not compute intensive enough for the sizes we were dealing with, since we were still using 50 hidden units. Thus, we increased our number of hidden units to 200 then 700, and this seemed to be more suited to leverage the GPU’s power and lead to a better speedup. 
 
-Batch Processing
+#### Batch Processing
 In order to better utilize the multiprocessors in the GPU, we decided to process images in batches. We processed 32 images at a time, with each input connecting to 32 hidden units as ~30 units suffices to achieve 95% accuracy with the MNIST dataset. Consequently, we would be launching 1024 blocks with 1024 threads each. This approach allowed us to increase compute intensiveness and only launch two kernel calls in both forward and backprop for every 32 
 images, instead of two for each image in both functions. This further optimization also helped reduce the sequential dependencies that existed between each training observation, since we didn’t have to wait for each image to be processed before moving to the next one.
 
@@ -36,8 +36,28 @@ We witnessed a much better speedup compared to the sequential version with this 
 
 
 **Results**
+We were successful in achieving all of our initial plans for the project as well as half of our hopes to achieve. We managed to achieve speedup proportional to the number of cores on the machine (8) when using OpenMP, predict MNIST images with an error rate of less than 5%, use both OpenMP and CUDA kernel calls to exploit data parallelism available to us, use batch processing to improve throughput of the network and further leverage the GPU, and use a shared memory model to improve the latency of memory accesses.
+
+Our input size was kept consistent with 60,000 training images, each of size 784 (28x28), and 10,000 test images. We measured our performance using both speedup against the sequential version of our code, as well as an application specific seconds/iteration where we timed how long it took for our neural net to do 1 complete sweep of all the training observations.
+
+
+![alt text](https://github.com/abhyvyth/parallel-project/blob/master/image3.png "results image")
+The graph above illustrates the speedups we achieved across the different mediums of parallelism, using 700 hidden units in our hidden layer. We see that OpenMP does consistently better than CUDA for this workload, in both feed-forward and backprop. After profiling our functions, we found this to be due to the fact that we are making 2 CUDA kernel calls for every image, in each function. Even though we increased our overall computation with larger matrices, the overhead of launching these kernels and copying this amount of data still outweighs the speedup of computation. 
+
+OpenMP still performs better as we only launch 16 threads over the 700 hidden units, and even though each thread is performing more work, the time to compute vector dot products is very small. Thus our workload is not significant enough yet to necessitate the use of CUDA kernels and the CUDA speedup vs our sequential implementation is just around 3x. We see that in backprop, OpenMP does not perform better than the sequential version by as large a factor as in feed-forward, whereas the speedup for CUDA improves. This is consistent with our line of thinking in that CUDA needs a more compute intensive task to be as effective, and not be bandwidth bound by the overhead of memory copies.
+
+![alt text](https://github.com/abhyvyth/parallel-project/blob/master/image1.png "results image")
+As we mentioned before, processing multiple images in parallel enabled us to increase compute intensiveness and finally warrant the overhead of launching CUDA kernels and leverage the GPU to achieve great speedup. Now we only have two kernel calls in each function for every 32 images, rather than every 1 image. Compared to the sequential versions, this implementation resulted in a 10x speedup for feed-forward and a 28x speedup for backpropagation. 
+
+![alt text](https://github.com/abhyvyth/parallel-project/blob/master/image2.png "results image")
+To wrap up, we wanted to compare our CUDA implementation across functions to some well defined baselines. We did this by substituting our matrix multiplication kernel in feed-forward with cuBLAS matrix multiplication function. After timing one iteration, we observed that our implementation took less time than that using cuBLAS. However, cuBLAS scales better as we increase number of hidden units. 
+
+It was surprising to us to see our CUDA implementation complete an iteration faster than using cuBLAS, which is one of the fastest GPU based matrix multiplication libraries out there. There are 2 possible reasons we think this could be the case. The first is that cuBLAS requires a certain threshold of compute intensiveness to start outperforming any other sort of implementation. This would be supported by the fact cuBLAS seems to scale better to greater numbers of hidden units than we do, since the factor by which its computation time increases is much smaller than that of ours. 
+
+The second reason that we found after inspecting our code was that there is an extra step of initializing a handle for cuBLAS that is being done in every call to feed forward. This also causes a slight slow down since we do all of our CUDA initialization in the class constructor, which unfortunately isn’t possible with a cuBLAS handle as the cuBLAS library cannot be imported into a header file.
 
 **References**
+
 Dahl, George, Alan McAvinney, and Tia Newhall. “Parallelizing neural network training for cluster systems.” Proceedings of the IASTED International Conference on Parallel and Distributed Computing and Networks. ACTA Press, 2008. https://www.cs.swarthmore.edu/~newhall/papers/pdcn08.pdf
 
 Krizhevsky, Alex. “One weird trick for parallelizing convolutional neural networks.”. eprint arXiv:1404.599. 2014. https://arxiv.org/pdf/1404.5997.pdf
@@ -47,6 +67,7 @@ Podlozhnyuk, Victor. “Image Convolution with CUDA.” http://developer.downloa
 Pethick, Mark, Michael Liddle, Paul Werstein, and Zhiyi Huang. “Parallelization of a Backpropagation Neural Network on a Cluster Computer.” 2003. http://www.cs.otago.ac.nz/staffpriv/hzy/papers/pdcs03.pdf
 
 **Work performed by each student** 
+
 Equal work was performed by both project members.
 
 ### CHECKPOINT REPORT
