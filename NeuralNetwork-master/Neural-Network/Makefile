@@ -21,9 +21,10 @@ HOSTNAME=$(shell hostname)
 LIBS       := 
 FRAMEWORKS :=
 
+# -I /opt/OpenBLAS/include/ -L/opt/OpenBLAS/lib -lopenblas
 NVCCFLAGS=-O3 -m64 -Xcompiler -fopenmp --gpu-architecture compute_35
 LIBS += GL glut cudart cublas
-
+# openblas
 
 ifneq ($(wildcard /opt/cuda-8.0/.*),)
 # Latedays

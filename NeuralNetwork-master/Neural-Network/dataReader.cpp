@@ -123,7 +123,7 @@ void dataReader::processLine( string &line )
 /*******************************************************************
 * Selects the data set creation approach
 ********************************************************************/
-void dataReader::setNumSets( int numSets)//int approach, double param1, double param2 )
+void dataReader::setNumSets( int numSets)//int approach, float param1, float param2 )
 {
 	//only 1 data set
 	numTrainingSets = numSets;

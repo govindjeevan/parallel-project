@@ -18,16 +18,16 @@
 using namespace std;
 
 
-// void gpu_blas_mmul(cublasHandle_t &handle, const float *A, const float *B, float *C, const int m, const int k, const int n) {
-// 	int lda=m, ldb=k, ldc=m;
-// 	const float alf =1;
-// 	const float bet =0;
-// 	const float *alpha = &alf; 
-// 	const float *beta =&bet;
+void gpu_blas_mmul(cublasHandle_t &handle, const float *A, const float *B, float *C, const int m, const int k, const int n) {
+	int lda=m, ldb=k, ldc=m;
+	const float alf =1;
+	const float bet =0;
+	const float *alpha = &alf; 
+	const float *beta =&bet;
 
 
-// 	cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
-// }
+	cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+}
 
 __global__ void
 back_prop_kernel(float *device_output, float *input, float *hidden, float* w2, float* outputErrorGradients, int nInput, int nHidden, int nOutput,  float learningRate) {
@@ -146,6 +146,28 @@ neuralNetworkTrainer::neuralNetworkTrainer( neuralNetwork *nn )	:	NN(nn),
 	// for ( int i=0; i <= NN->nOutput; i++ ) outputErrorGradients[i] = 0;
 }
 
+/*******************************************************************
+* destructor
+********************************************************************/
+neuralNetworkTrainer::~neuralNetworkTrainer()
+{
+
+
+	//delete weight storage
+	for (int i=0; i <= NN->nInput; i++) delete[] deltaInputHidden[i];
+	delete[] deltaInputHidden;
+
+	for (int j=0; j <= NN->nHidden; j++) delete[] deltaHiddenOutput[j];
+	delete[] deltaHiddenOutput;
+
+	
+	cudaFree(device_output1);
+	cudaFree(input);
+	cudaFree(hidden);
+	cudaFree(w2);
+	cudaFree(output_error_gradients);
+	
+}
 
 /*******************************************************************
 * Set training parameters
@@ -244,7 +266,7 @@ void neuralNetworkTrainer::trainNetwork( trainingDataSet* tSet )
 		double previousGAccuracy = generalizationSetAccuracy;
 
 		//use training set to train network
-		runTrainingEpoch( tSet->trainingSet );
+		runTrainingEpoch( tSet->trainingSet , epoch);
 
 		// trainingSetAccuracy = NN->getSetAccuracy( tSet->trainingSet );
 		//get generalization set accuracy
@@ -284,7 +306,7 @@ void neuralNetworkTrainer::trainNetwork( trainingDataSet* tSet )
 /*******************************************************************
 * Run a single training epoch
 ********************************************************************/
-void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
+void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet , int epoch)
 {
 	double startIter = CycleTimer::currentSeconds();
 	//incorrect patterns
@@ -318,6 +340,7 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 
 			updateWeights();
 			largePattern.clear();
+			largeTarget.clear();
 		} else {
 			startForward = CycleTimer::currentSeconds();
 			NN->feedForward( trainingSet[tp]->pattern );
@@ -330,18 +353,16 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 
 		
 	    double timeForward = endForward - startForward;
-
-	    // printf("Forward: %f\n", timeForward);
-
 	    double timeBack = endBack - startBack;
-
-	    printf("Backprop: %f\n", timeBack);
-
 	    double timeBoth = endBack - startForward;
 
-	    // printf("Both: %f\n", timeBoth);
+	    if (epoch) {
+		    // printf("Forward: %f\n", timeForward);
+		    // printf("Backprop: %f\n", timeBack);
+		    // printf("Both: %f\n", timeBoth);
+	    }
 
-
+	    
 		int predicted = distance(NN->outputNeurons, max_element(NN->outputNeurons, NN->outputNeurons + NN->nOutput));
 		int expected = distance(trainingSet[tp]->target, max_element(trainingSet[tp]->target, trainingSet[tp]->target + NN->nOutput));
 		
@@ -350,8 +371,6 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 		
 	}//end for
 
-	//if using batch learning - update the weights
-	// if ( useBatch ) updateWeights();
 	
 	//update training accuracy
 	trainingSetAccuracy = 100 - (incorrectPatterns/trainingSet.size() * 100);
@@ -367,6 +386,7 @@ void neuralNetworkTrainer::runTrainingEpoch( vector<dataEntry*> trainingSet )
 * Propagate errors back through NN and calculate delta values in batches
 ********************************************************************/
 void neuralNetworkTrainer::backpropagateBatch(vector<float*> desiredOutputsVector) {
+
 	for (int b=0; b<NN->batchSize; b++) {
 		// #pragma omp parallel
 		// {
@@ -390,7 +410,8 @@ void neuralNetworkTrainer::backpropagateBatch(vector<float*> desiredOutputsVecto
 					deltaHiddenOutput[j][k] += learningRate * NN->hiddenNeurons[b*j] * outputErrorGradients[b*k];
 				}
 			}
-			
+
+			double startFor = CycleTimer::currentSeconds();
 			// #pragma omp for
 			for (int j = 0; j < NN->nHidden; j++)
 			{
@@ -403,15 +424,19 @@ void neuralNetworkTrainer::backpropagateBatch(vector<float*> desiredOutputsVecto
 				{
 					//calculate change in weight 
 					// #pragma omp atomic
-					deltaInputHidden[i][j] += learningRate * NN->inputNeurons[b*i] * hiddenErrorGradients[b*j]; 
-
+					deltaInputHidden[i][j] += learningRate * NN->inputNeurons[b*i] * hiddenErrorGradients[b*j];
 				}
 			}
+			double endFor = CycleTimer::currentSeconds();
+			double timeFor = endFor - startFor;
+
+			// printf("for: %f\n", timeFor);
 			
 			
 		// }
 	}
 /*
+	double startCuda = CycleTimer::currentSeconds();
 	dim3 blockDim(1024, 1);
     dim3 gridDim(NN->nHidden);
     cudaMemcpy(input, NN->inputNeurons, sizeof(float) * ((NN->nInput)+1) *(NN->batchSize), cudaMemcpyHostToDevice);
@@ -420,6 +445,11 @@ void neuralNetworkTrainer::backpropagateBatch(vector<float*> desiredOutputsVecto
     cudaMemcpy(output_error_gradients, outputErrorGradients, sizeof(float) * (NN->batchSize)*((NN->nOutput)+1), cudaMemcpyHostToDevice);
     back_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, hidden, w2, output_error_gradients, (NN->nInput)+1, NN->nHidden, NN->nOutput, learningRate);
     cudaMemcpy(deltaInputHidden[0], device_output1, ((NN->nInput) +1)*(NN->nHidden)*sizeof(float), cudaMemcpyDeviceToHost);
+
+    double endCuda = CycleTimer::currentSeconds();
+    double timeCuda = endCuda - startCuda;
+    printf("cuda: %f\n", timeCuda);
+
 */
 }
 
@@ -428,11 +458,11 @@ void neuralNetworkTrainer::backpropagateBatch(vector<float*> desiredOutputsVecto
 ********************************************************************/
 void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
 {	
-	// #pragma omp parallel
-	// {
+	#pragma omp parallel
+	{
 		//modify deltas between hidden and output layers
 		//--------------------------------------------------------------------------------------------------------
-		// #pragma omp for
+		#pragma omp for
 		for (int k = 0; k < NN->nOutput; k++)
 		{
 			// cout << "TNUM " << omp_get_thread_num() << endl;
@@ -453,8 +483,10 @@ void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
 		}
 		//modify deltas between input and hidden layers
 		//--------------------------------------------------------------------------------------------------------
-		/*
-		// #pragma omp for
+		
+		double startFor = CycleTimer::currentSeconds();
+
+		#pragma omp for
 		for (int j = 0; j < NN->nHidden; j++)
 		{
 			//get error gradient for every hidden node
@@ -470,11 +502,17 @@ void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
 
 			}
 		}
-		*/
-		
-		
-	// }
 
+		double endFor = CycleTimer::currentSeconds();
+		double timeFor = endFor - startFor;
+		
+		// printf("for: %f\n", timeFor);
+		
+		
+	}
+/*
+	
+	double startCuda = CycleTimer::currentSeconds();
 	
 	
 	dim3 blockDim(1024, 1);
@@ -487,6 +525,10 @@ void neuralNetworkTrainer::backpropagate( float* desiredOutputs )
     cudaMemcpy(deltaInputHidden[0], device_output1, (NN->batchSize)*(NN->nInput +1)*(NN->nHidden)*sizeof(float), cudaMemcpyDeviceToHost);
 	
 
+	double endCuda = CycleTimer::currentSeconds();
+    double timeCuda = endCuda - startCuda;
+    // printf("cuda: %f\n", timeCuda);
+*/
 	/*
 	cublasHandle_t handle;
 	cublasCreate(&handle);

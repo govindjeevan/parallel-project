@@ -7,6 +7,7 @@
 #define NNetwork
 
 #include "dataReader.h"
+// #include <cublas_v2.h>
 
 class neuralNetworkTrainer;
 
@@ -35,7 +36,9 @@ private:
 	float *device_output2;
 	float *hidden;
 	float *w2;
-		
+
+	// cublasHandle_t handle;
+
 	//Friends
 	//--------------------------------------------------------------------------------------------
 	friend neuralNetworkTrainer;

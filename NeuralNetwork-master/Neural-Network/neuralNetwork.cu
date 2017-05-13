@@ -61,8 +61,8 @@ forward_prop_kernel(float *device_output, float *input, float *weights, int num_
     __syncthreads();
 
     if (linearThreadIndex == 0 && unit < num_second) {
-    	// device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_first]));
-    	device_output[unit] = prefixSumOutput[num_first];
+    	device_output[unit] = 1/(1+exp(-1*prefixSumOutput[num_first]));
+    	// device_output[unit] = prefixSumOutput[num_first];
     }
 }
 
@@ -195,6 +195,8 @@ neuralNetwork::~neuralNetwork()
 	cudaFree(device_output2);
 	cudaFree(hidden);
 	cudaFree(w2);
+
+	cublasDestroy(handle);
 	
 }
 
@@ -275,6 +277,7 @@ void neuralNetwork::initializeWeights()
 {
 	double startTime = CycleTimer::currentSeconds();
 
+	cublasCreate(&handle);
 	
 	cudaMalloc(&device_output1, sizeof(float) * batchSize*nHidden);
     cudaMalloc(&input, sizeof(float) * batchSize*(nInput+1));
@@ -371,25 +374,21 @@ void neuralNetwork::feedForward(float* pattern)
     cudaMemcpy(w1, wInputHidden[0], (nInput+1)*nHidden*sizeof(float), cudaMemcpyHostToDevice);
     // double endTime2 = CycleTimer::currentSeconds();
 
-	forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
+	// forward_prop_kernel<<<gridDim, blockDim>>>(device_output1, input, w1, nInput+1, nHidden);
 
-	cudaThreadSynchronize();
+	// cudaThreadSynchronize();
 	// // double endTime3 = CycleTimer::currentSeconds();
 
-    cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
+    // cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
 	// // double endTime4 = CycleTimer::currentSeconds();
 	
-
-/*
-	cublasHandle_t handle;
-	cublasCreate(&handle);
 
 	gpu_blas_mmul(handle, input, w1, device_output1, 1, nInput+1, nHidden);
 
 	cudaMemcpy(hiddenNeurons, device_output1, nHidden*sizeof(float), cudaMemcpyDeviceToHost);
 
 
-	cublasDestroy(handle);*/
+	
 	
         /*float alpha = 1.0;
         float beta = 0.0;
@@ -415,16 +414,18 @@ void neuralNetwork::feedForward(float* pattern)
 
     //Calculate Hidden Layer values - include bias neuron
 	//--------------------------------------------------------------------------------------------------------
-	
+
 	#pragma omp parallel 
 	{
+	
 		#pragma omp for
 		for (int j = 0; j<nHidden; j++) {
 			hiddenNeurons[j] = activationFunction( hiddenNeurons[j] );
 		}
 
+/*
 		float temp = 0.0;
-		/*
+		
 		// #pragma omp for //schedule(static, 16)
 		for(int j=0; j < nHidden; j++)
 		{
@@ -441,13 +442,13 @@ void neuralNetwork::feedForward(float* pattern)
 			hiddenNeurons[j] = activationFunction( temp );			
 			// cout << "output: " << hiddenNeurons[j] << endl;
 		}
-		*/
+		
 	
 		// double endTime1 = CycleTimer::currentSeconds();
 		// printf("Time:%f\n", endTime1 - startTime);
 		//Calculating Output Layer values - include bias neuron
 		//--------------------------------------------------------------------------------------------------------
-		#pragma omp for //schedule(static, 16)//reduction(+ : temp)
+		// #pragma omp for //schedule(static, 16)//reduction(+ : temp)
 		for(int k=0; k < nOutput; k++)
 		{
 			temp = 0.0;
@@ -461,12 +462,14 @@ void neuralNetwork::feedForward(float* pattern)
 			}
 			//set to result of sigmoid
 			outputNeurons[k] = activationFunction( temp );
-		}
+		}*/
 	}
+
+
 	
 	
 	
-/*
+
     dim3 gridDim2(nOutput);//((1024*1024) + blockDim.x - 1) / blockDim.x);
 	
     cudaMemcpy(hidden, hiddenNeurons, sizeof(float) * (nHidden+1), cudaMemcpyHostToDevice);
@@ -475,14 +478,26 @@ void neuralNetwork::feedForward(float* pattern)
     cudaMemcpy(w2, wHiddenOutput[0], (nHidden+1)*nOutput*sizeof(float), cudaMemcpyHostToDevice);
     // double endTime2 = CycleTimer::currentSeconds();
 
-	forward_prop_kernel<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput);
+	// forward_prop_kernel<<<gridDim2, blockDim>>>(device_output2, hidden, w2, nHidden+1, nOutput);
 
-	cudaThreadSynchronize();
-	// double endTime3 = CycleTimer::currentSeconds();
+	// cudaThreadSynchronize();
+	// // double endTime3 = CycleTimer::currentSeconds();
+
+	// cudaMemcpy(outputNeurons, device_output2, nOutput*sizeof(float), cudaMemcpyDeviceToHost);
+	// double endTime4 = CycleTimer::currentSeconds();
+
+
+	gpu_blas_mmul(handle, hidden, w2, device_output2, 1, nHidden+1, nOutput);
 
 	cudaMemcpy(outputNeurons, device_output2, nOutput*sizeof(float), cudaMemcpyDeviceToHost);
-	// double endTime4 = CycleTimer::currentSeconds();
-*/
+
+	#pragma omp parallel 
+	{
+		#pragma omp for
+		for (int k = 0; k<nOutput; k++) {
+			outputNeurons[j] = activationFunction( outputNeurons[k] );
+		}
+	}
 
 	// double endTime3 = CycleTimer::currentSeconds();
 

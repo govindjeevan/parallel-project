@@ -36,15 +36,15 @@ private:
 	neuralNetwork* NN;
 
 	//learning parameters
-	double learningRate;					// adjusts the step size of the weight update	
-	// double momentum;						// improves performance of stochastic learning (don't use for batch)
+	float learningRate;					// adjusts the step size of the weight update	
+	// float momentum;						// improves performance of stochastic learning (don't use for batch)
 
 	//epoch counter
 	long epoch;
 	long maxEpochs;
 	
 	//accuracy/MSE required
-	double desiredAccuracy;
+	float desiredAccuracy;
 	
 	//change to weights
 	float** deltaInputHidden;
@@ -61,12 +61,12 @@ private:
     float *output_error_gradients; 
 
 	//accuracy stats per epoch
-	double trainingSetAccuracy;
-	double validationSetAccuracy;
-	double generalizationSetAccuracy;
-	// double trainingSetMSE;
-	// double validationSetMSE;
-	// double generalizationSetMSE;
+	float trainingSetAccuracy;
+	float validationSetAccuracy;
+	float generalizationSetAccuracy;
+	// float trainingSetMSE;
+	// float validationSetMSE;
+	// float generalizationSetMSE;
 
 	//batch learning flag
 	bool useBatch;
@@ -82,7 +82,9 @@ private:
 public:	
 	
 	neuralNetworkTrainer( neuralNetwork* untrainedNetwork );
-	// void setTrainingParameters( double lR, double m, bool batch );
+	~neuralNetworkTrainer();
+
+	// void setTrainingParameters( float lR, float m, bool batch );
 	void setTrainingParameters( double lR, bool batch );
 	void setStoppingConditions( int mEpochs, double dAccuracy);
 	void useBatchLearning( bool flag ){ useBatch = flag; }
@@ -96,7 +98,7 @@ private:
 	inline float getOutputErrorGradient( float desiredValue, float outputValue );
 	float getHiddenErrorGradient( int j );
 	float getHiddenErrorGradientBatch( int j, int b );
-	void runTrainingEpoch( std::vector<dataEntry*> trainingSet );
+	void runTrainingEpoch( std::vector<dataEntry*> trainingSet , int epoch);
 	void backpropagateBatch(std::vector<float*> desiredOutputsVector);
 	void backpropagate(float* desiredOutputs);
 	void updateWeights();
