@@ -56,7 +56,6 @@ It was surprising to us to see our CUDA implementation complete an iteration fas
 The second reason that we found after inspecting our code was that there is an extra step of initializing a handle for cuBLAS that is being done in every call to feed forward. This also causes a slight slow down since we do all of our CUDA initialization in the class constructor, which unfortunately isn’t possible with a cuBLAS handle as the cuBLAS library cannot be imported into a header file.
 
 **References**
-
 Dahl, George, Alan McAvinney, and Tia Newhall. “Parallelizing neural network training for cluster systems.” Proceedings of the IASTED International Conference on Parallel and Distributed Computing and Networks. ACTA Press, 2008. https://www.cs.swarthmore.edu/~newhall/papers/pdcn08.pdf
 
 Krizhevsky, Alex. “One weird trick for parallelizing convolutional neural networks.”. eprint arXiv:1404.599. 2014. https://arxiv.org/pdf/1404.5997.pdf
@@ -66,7 +65,6 @@ Podlozhnyuk, Victor. “Image Convolution with CUDA.” http://developer.downloa
 Pethick, Mark, Michael Liddle, Paul Werstein, and Zhiyi Huang. “Parallelization of a Backpropagation Neural Network on a Cluster Computer.” 2003. http://www.cs.otago.ac.nz/staffpriv/hzy/papers/pdcs03.pdf
 
 **Work performed by each student** 
-
 Equal work was performed by both project members.
 
 ### CHECKPOINT REPORT
