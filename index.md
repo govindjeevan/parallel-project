@@ -45,10 +45,10 @@ The graph above illustrates the speedups we achieved across the different medium
 
 OpenMP still performs better as we only launch 16 threads over the 700 hidden units, and even though each thread is performing more work, the time to compute vector dot products is very small. Thus our workload is not significant enough yet to necessitate the use of CUDA kernels and the CUDA speedup vs our sequential implementation is just around 3x. We see that in backprop, OpenMP does not perform better than the sequential version by as large a factor as in feed-forward, whereas the speedup for CUDA improves. This is consistent with our line of thinking in that CUDA needs a more compute intensive task to be as effective, and not be bandwidth bound by the overhead of memory copies.
 
-![alt text](https://github.com/abhyvyth/parallel-project/blob/master/image1.png "results image")
+![alt text](image1.png "results image")
 As we mentioned before, processing multiple images in parallel enabled us to increase compute intensiveness and finally warrant the overhead of launching CUDA kernels and leverage the GPU to achieve great speedup. Now we only have two kernel calls in each function for every 32 images, rather than every 1 image. Compared to the sequential versions, this implementation resulted in a 10x speedup for feed-forward and a 28x speedup for backpropagation. 
 
-![alt text](https://github.com/abhyvyth/parallel-project/blob/master/image2.png "results image")
+![alt text](image2.png "results image")
 To wrap up, we wanted to compare our CUDA implementation across functions to some well defined baselines. We did this by substituting our matrix multiplication kernel in feed-forward with cuBLAS matrix multiplication function. After timing one iteration, we observed that our implementation took less time than that using cuBLAS. However, cuBLAS scales better as we increase number of hidden units. 
 
 It was surprising to us to see our CUDA implementation complete an iteration faster than using cuBLAS, which is one of the fastest GPU based matrix multiplication libraries out there. There are 2 possible reasons we think this could be the case. The first is that cuBLAS requires a certain threshold of compute intensiveness to start outperforming any other sort of implementation. This would be supported by the fact cuBLAS seems to scale better to greater numbers of hidden units than we do, since the factor by which its computation time increases is much smaller than that of ours. 
