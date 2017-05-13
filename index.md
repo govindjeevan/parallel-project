@@ -1,7 +1,7 @@
 # Parallelizing a Deep Neural Network
 
 ### FINAL REPORT
-![alt text](https://docs.google.com/spreadsheets/d/1f35bBukkaQNNO6rTPaEKmbf7LDdMQo6GU1JtCCGfGfU/pubchart?oid=143597527&format=interactive "Logo Title Text 1")
+![alt text](https://github.com/abhyvyth/parallel-project/blob/master/image1.png "Logo Title Text 1")
 We implemented the parallelization of the training stages of a deep neural network to classify handwritten digits from the MNIST dataset. We looked at what sort of workloads we need to have in order to well utilize both multi-core parallelism using OpenMP and leverage multiprocessors on the GPU using CUDA. We also looked at optimizing our parallelism using batch processing, where we feed a group of images through the network at once and consequently update the weights using the delta errors that we accumulate from the batch. While our OpenMP implementation did well in comparison to the sequential version, achieving a 10x speedup in feed-forward and 7.5x speedup in backprop, our CUDA implementation did not start to show its true potential until after we implemented batch processing, where it achieved a 10x speedup in feed-forward and 28x speedup in backprop compared to the sequential version.
 
 **Background**
