@@ -101,25 +101,25 @@ neuralNetwork::neuralNetwork(int nI, int nH, int nO) : nInput(nI), nHidden(nH), 
 {				
 	//create neuron lists
 	//--------------------------------------------------------------------------------------------------------
-	inputNeurons = new( double[nInput + 1] );
+	inputNeurons = new( float[nInput + 1] );
 	for ( int i=0; i < nInput; i++ ) inputNeurons[i] = 0;
 
 	//create input bias neuron
 	inputNeurons[nInput] = -1;
 
-	hiddenNeurons = new( double[nHidden + 1] );
+	hiddenNeurons = new( float[nHidden + 1] );
 	for ( int i=0; i < nHidden; i++ ) hiddenNeurons[i] = 0;
 
 	//create hidden bias neuron
 	hiddenNeurons[nHidden] = -1;
 
-	outputNeurons = new( double[nOutput] );
+	outputNeurons = new( float[nOutput] );
 	for ( int i=0; i < nOutput; i++ ) outputNeurons[i] = 0;
 
 	//create weight lists (include bias neuron weights)
 	//--------------------------------------------------------------------------------------------------------
-	wInputHidden = new( double*[nInput + 1] );
-	wInputHidden[0] = new (double[(nInput + 1)*nHidden]);
+	wInputHidden = new( float*[nInput + 1] );
+	wInputHidden[0] = new (float[(nInput + 1)*nHidden]);
 	for ( int i=1; i <= nInput; i++ ) {
 		wInputHidden[i] = wInputHidden[i-1] + nHidden;
 	}
@@ -128,8 +128,8 @@ neuralNetwork::neuralNetwork(int nI, int nH, int nO) : nInput(nI), nHidden(nH), 
 		for ( int j=0; j < nHidden; j++ ) wInputHidden[i][j] = 0;		
 	}
 
-	wHiddenOutput = new( double*[nHidden + 1] );
-	wHiddenOutput[0] = new (double[(nHidden + 1)*nOutput]);
+	wHiddenOutput = new( float*[nHidden + 1] );
+	wHiddenOutput[0] = new (float[(nHidden + 1)*nOutput]);
 	for ( int i=1; i <= nHidden; i++ ) {
 		wHiddenOutput[i] = wHiddenOutput[i-1] + nOutput;
 	}
@@ -298,7 +298,7 @@ void neuralNetwork::initializeWeights()
 /*******************************************************************
 * Activation Function
 ********************************************************************/
-inline double neuralNetwork::activationFunction( double x )
+inline float neuralNetwork::activationFunction( float x )
 {
 	//sigmoid function
 	return 1/(1+exp(-x));
@@ -307,7 +307,7 @@ inline double neuralNetwork::activationFunction( double x )
 /*******************************************************************
 * Feed Forward Operation
 ********************************************************************/
-void neuralNetwork::feedForward(double* pattern)
+void neuralNetwork::feedForward(float* pattern)
 {
 	//set input neurons to input values
 	for(int i = 0; i < nInput; i++) {

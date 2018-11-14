@@ -14,7 +14,7 @@
 #include "neuralNetwork.h"
 #include "neuralNetworkTrainer.h"
 // #include <cublas_v2.h>
-
+#include "dataReader.h"
 #include "CycleTimer.h"
 
 //use standard namespace
@@ -28,7 +28,7 @@ int main()
 	
 	//create data set reader and load data file
 	dataReader d;
-	d.loadDataFile("mnist_train.csv",784,10);
+	d.loadDataFile("mnist_test.csv",784,10);
 	d.setNumSets(1);
 	// d.setCreationApproach( STATIC, 10 );	
 
@@ -49,7 +49,8 @@ int main()
 	}
 
 	//save the weights
-	nn.saveWeights("weights.csv");
+	char wt[]="weights.csv";
+	nn.saveWeights(wt);
 
 	double endTime = CycleTimer::currentSeconds();
     double totalTime = endTime - startTime;

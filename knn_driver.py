@@ -5,6 +5,7 @@ import random
 
 from utils import parse_images
 from utils import parse_labels
+from utils import plot_image
 
 from neural_net import NeuralNet
 
@@ -19,22 +20,22 @@ y_test_path = 'data/y_test'
 class TestClassifiers(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
-		print "Setting up test environment..."
-		print "\tParsing images"
+		print ("Setting up test environment...")
+		print ("\tParsing images")
 		cls.X_train = parse_images(x_train_path)
 		cls.X_test = parse_images(x_test_path)
-		print "\tParsing labels"
+		print ("\tParsing labels")
 		cls.y_train = parse_labels(y_train_path)
 		cls.y_test = parse_labels(y_test_path)
-		print "Finished setting up testing environment\n"
-    	random.seed(0)
-    	np.random.seed(0)
+		print ("Finished setting up testing environment\n")
+		random.seed(0)
+		np.random.seed(0)
 
 
 
 	def test_knn_classification_k_3(self):
 
-		print "Constructing "
+		print ("Constructing ")
 
 
 		learning_rate = 0.5
@@ -50,10 +51,10 @@ class TestClassifiers(unittest.TestCase):
 		candidate.train(trainX, trainY, iterations)
 
 		cand_error = candidate.test(self.X_train[:100,:], self.y_train[:100])
-		print "Train fraction: ", cand_error
+		print ("Train fraction: ", cand_error)
 		cand_error = candidate.test(self.X_test[:100,:], self.y_test[:100])
-		print "Test fraction: ", cand_error
-
+		print ("Test fraction: ", cand_error)
+		plot_image(cand_error)
 
 	
 def main():

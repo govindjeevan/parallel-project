@@ -28,6 +28,7 @@
 //#include "/afs/cs/academic/class/15418-s17/public/sw/OpenBLAS/cblas.h"
 //#include <openblas/cblas.h>
 using namespace std;
+cublasHandle_t handle;
 
 void gpu_blas_mmul(cublasHandle_t &handle, const float *A, const float *B, float *C, const int m, const int k, const int n) {
 	int lda=m, ldb=k, ldc=m;
@@ -495,7 +496,7 @@ void neuralNetwork::feedForward(float* pattern)
 	{
 		#pragma omp for
 		for (int k = 0; k<nOutput; k++) {
-			outputNeurons[j] = activationFunction( outputNeurons[k] );
+			outputNeurons[k] = activationFunction( outputNeurons[k] );
 		}
 	}
 

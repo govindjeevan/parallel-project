@@ -65,11 +65,11 @@ class NeuralNet:
     self.x = x
     (w1, w2) = (self.w1, self.w2)
     product = np.dot([x], w1)
-    for i in xrange(self.num_hidden):
+    for i in range(self.num_hidden):
         product[0][i] = self.apply_sigmoid(product[0][i])
     self.sigmoid_product = product 
     predicted=np.dot(product, w2)
-    for i in xrange(self.num_outputs):
+    for i in range(self.num_outputs):
         predicted[0][i] = self.apply_sigmoid(predicted[0][i])
     self.predicted = predicted
     return predicted[0]
@@ -86,12 +86,12 @@ class NeuralNet:
     predicted = self.predicted
     sigmoid_product = self.sigmoid_product
     delt2 = [float(0) for i in range(self.num_outputs)]
-    for i in xrange(self.num_outputs):
+    for i in range(self.num_outputs):
         delt2[i] = float(predicted[0][i]*(1-predicted[0][i])*(target[i]-predicted[0][i]))
     temp  = np.multiply(w2, delt2)
     sum_temp= np.sum(temp, axis=1)
     delth=[[float(0)] for i in range(self.num_hidden)]
-    for i in xrange(self.num_hidden):
+    for i in range(self.num_hidden):
         delth[i][0]=float(sigmoid_product[0][i]*(float(1)-sigmoid_product[0][i])*sum_temp[i])
 
     delt2_scaled = np.multiply(delt2, self.learning_rate)
@@ -112,8 +112,8 @@ class NeuralNet:
         of the observations.
     - iterations is how many passes over X should be completed.
     """
-    for i in xrange(iterations):
-        for j in xrange((X.shape)[0]):
+    for i in range(iterations):
+        for j in range((X.shape)[0]):
             self.forward_propagate(X[j])
             label = np.zeros(shape=(10,), dtype=np.float32)
             label[Y[j]] = float(1)
@@ -132,12 +132,12 @@ class NeuralNet:
     """
 
     wrong = float(0)
-    for i in xrange((X.shape)[0]):
+    for i in range((X.shape)[0]):
         self.forward_propagate(X[i])
         prob = np.argmax(self.predicted[0])
         if prob != (Y[i]):
-            print prob
-            print Y[i]
+            print (prob)
+            print (Y[i])
             wrong+=1
     return float(wrong)/float((Y.shape)[0])
    

@@ -1,5 +1,6 @@
 import numpy as np
 import struct
+import matplotlib.pyplot as plt
 
 def parse_images(filename):
     f = open(filename, "rb")

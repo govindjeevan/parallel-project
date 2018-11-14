@@ -18,16 +18,6 @@
 using namespace std;
 
 
-void gpu_blas_mmul(cublasHandle_t &handle, const float *A, const float *B, float *C, const int m, const int k, const int n) {
-	int lda=m, ldb=k, ldc=m;
-	const float alf =1;
-	const float bet =0;
-	const float *alpha = &alf; 
-	const float *beta =&bet;
-
-
-	cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
-}
 
 __global__ void
 back_prop_kernel(float *device_output, float *input, float *hidden, float* w2, float* outputErrorGradients, int nInput, int nHidden, int nOutput,  float learningRate) {

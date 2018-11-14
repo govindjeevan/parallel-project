@@ -1,12 +1,11 @@
 EXECUTABLE := run_nn
 
-CU_FILES   := neuralNetwork.cu neuralNetworkTrainer.cu
-# CU_FILES   := seqNeuralNetwork.cu
+#CU_FILES   := neuralNetwork.cu neuralNetworkTrainer.cu
+CU_FILES   := seqNeuralNetwork.cu
 
 CU_DEPS    :=
 
-CC_FILES   := main.cpp dataReader.cpp 
-#neuralNetwork.cpp neuralNetworkTrainer.cpp
+CC_FILES   := main.cpp dataReader.cpp neuralNetwork.cpp neuralNetworkTrainer.cpp
 
 # LOGS	   := logs
 
